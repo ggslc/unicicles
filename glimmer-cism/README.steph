@@ -1,0 +1,63 @@
+This directory should contain a modified version of glimmer-cism based on the cesm 1.2.0 release. 
+
+The modifications are all in the name of the UKESM effort, and include
+
+1. coupling BISICLES through glint to climate models using the simple cdriver interface (as opposed to the more complex interface under development at LBL)
+
+
+Building is still based on autotools (NOT Cmake). It works under automake 1.4 and 1.4.1, libtool 2.4.2, autoconf 2.6.9, 
+but the orginal claims to need only older versions that then fails in either bootstrap or configure.  
+So, update these tools before proceeding, they are easy to download and compile.
+
+ 
+machine notes:
+
+smbp, GNU C, serial, no bisicles
+
+> svn co  https://svn.ggy.bris.ac.uk/subversion/will-roberts/glimmer-cism cism-src
+> mkdir cism-serial-vanilla
+> cd cism-src
+> ./bootstrap
+> cd ../cism-serial-vanilla
+> FC=gfortran FCFLAGS="-fno-range-check -ffree-line-length-0 -g" ../cism-src/configure --with-netcdf=/home/steph/Programs/netcdf/serial --with-hdf5=/home/steph/Programs/hdf5/serial --prefix=/home/steph/Programs/cism-serial-vanilla/
+> make
+> make install
+
+smbp, GNU C, serial, with bisicles
+
+> svn co  https://svn.ggy.bris.ac.uk/subversion/will-roberts/glimmer-cism cism-src
+> mkdir cism-serial
+> cd cism-src
+> ./bootstrap
+> cd ../cism-serial
+>FC=gfortran FCFLAGS="-fno-range-check -ffree-line-length-0 -DBISICLES_CDRIVER -DNO_RESCALE -g -I/home/steph/Programs/BISICLES/code/cdriver " LDFLAGS="-L/home/steph/Programs/BISICLES/code/cdriver -lBisicles2d.Linux.64.g++.gfortran.DEBUG -lChomboLibs2d.Linux.64.g++.gfortran.DEBUG -lpython2.7 " ../cism-src/configure --with-netcdf=/home/steph/Programs/netcdf/serial --with-hdf5=/home/steph/Programs/hdf5/serial --prefix=/home/steph/Programs/cism-serial/
+> make
+> make install
+
+smbp, GNU C, parallel, with bisicles
+
+> svn co  https://svn.ggy.bris.ac.uk/subversion/will-roberts/glimmer-cism cism-src
+> mkdir cism-parallel
+> cd cism-src
+> ./bootstrap
+> cd ../cism-parallel
+> FC=mpif90 CXX=mpiCC FCFLAGS="-fno-range-check -ffree-line-length-0 -DBISICLES_CDRIVER -g -I/home/steph/Programs/BISICLES/code/cdriver " LDFLAGS="-L/home/steph/Programs/BISICLES/code/cdriver -lBisicles2d.Linux.64.mpiCC.gfortran.DEBUG.MPI -lChomboLibs2d.Linux.64.mpiCC.gfortran.DEBUG.MPI -lpython2.7 " ../cism-src/configure --with-netcdf=/home/steph/Programs/netcdf/parallel --with-hdf5=/home/steph/Programs/hdf5/parallel --enable-mpi --prefix=/home/steph/Programs/cism-parallel/
+> make
+> make install
+
+
+dartagnan, GNU C, serial, with bisicles
+
+> svn co https://svn.ggy.bris.ac.uk/subversion/will-roberts/glimmer-cism cism-src
+> cd cism-src
+> mkdir ../cism-serial
+> cd ../cism-serial
+> FC=gfortran FCFLAGS="-fno-range-check -ffree-line-length-0 -DBISICLES_CDRIVER -DNO_RESCALE -g -I/data/ggslc/opt/BISICLES/BISICLES/code/cdriver " LDFLAGS="-L/data/ggslc/opt/BISICLES/BISICLES/code/cdriver -lBisicles2d.Linux.64.g++.gfortran.DEBUG.OPT -lChomboLibs2d.Linux.64.g++.gfortran.DEBUG.OPT -lpython2.4 " ../cism-src/configure --with-netcdf=/data/ggslc/opt/BISICLES/netcdf/serial --with-hdf5=/data/ggslc/opt/BISICLES/hdf5/serial --prefix=/data/ggslc/opt/BISICLES/cism-serial/
+> make
+> make install
+
+dartagnan, GNU C, serial, with bisicles
+
+> mkdir cism-parallel
+> cd cism-parallel
+> FC=mpif90 CC=mpicc CXX=mpic++ FCFLAGS="-fno-range-check -ffree-line-length-0 -DBISICLES_CDRIVER -DNO_RESCALE -g -I/data/ggslc/opt/BISICLES/BISICLES/code/cdriver " LDFLAGS="-L/data/ggslc/opt/BISICLES/BISICLES/code/cdriver -lBisicles2d.Linux.64.mpic++.gfortran.DEBUG.OPT.MPI -lChomboLibs2d.Linux.64.mpic++.gfortran.DEBUG.OPT.MPI -lpython2.4 " ../cism-src/configure --with-netcdf=/data/ggslc/opt/BISICLES/netcdf/parallel --with-hdf5=/data/ggslc/opt/BISICLES/hdf5/parallel --prefix=/data/ggslc/opt/BISICLES/cism-parallel/ --enable-mpi

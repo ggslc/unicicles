@@ -1,0 +1,10 @@
+ &gcm_params
+ il_im=192,
+ il_jm=144,
+ il_km=10,
+ elev_hgt=31.86 297.01 551.87 846.16 1151.70 1457.07 1808.83 2257.02  2737.89 3099.39,
+ start_time=1,
+ forcing_timestep=8640
+ fromgcm_filename='ad151a.pm1988sep.IceCoupling.nc',
+ togcm_filename='fromBIKE_1.nc',
+ /

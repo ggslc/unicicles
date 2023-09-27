@@ -1,0 +1,14 @@
+Some tests used during the UKESM Um/Glimmer-CISM/BISICLES coupling efforts
+
+1. glint_example. Used when developing Glimmer-CISM/BISICLES interface
+
+use the glint_example binary. either
+
+/pathto/glint_example gland20.config glint_example.config
+
+to run vanilla Glimmer-CISM (with Glide ice dynamics), or
+
+/pathto/glint_example gland20.bike.config glint_example.config
+
+to run with BISICLES ice dynamics
+
