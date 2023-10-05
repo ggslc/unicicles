@@ -1396,7 +1396,7 @@ C***REFERENCES  (NONE)
 C***ROUTINES CALLED  (NONE)
 C***END PROLOGUE  DSMMI2
       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
-      INTEGER N, IL(1), JL(1), IU(1), JU(1)
+      INTEGER N, IL(N), JL(1), IU(1), JU(N)
       DOUBLE PRECISION B(N), X(N), L(1), DINV(N), U(N)
 C         
 C         Solve  L*Y = B,  storing result in X, L stored by rows.
