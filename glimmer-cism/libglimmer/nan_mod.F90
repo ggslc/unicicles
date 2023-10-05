@@ -37,10 +37,10 @@ module nan_mod
 
 #ifdef __PGI
 ! quiet nan for portland group compilers
-  real(dp), parameter :: NaN = O'0777700000000000000000'
+  real(dp), parameter :: NaN = dble(O'0777700000000000000000')
 #else
 ! signaling nan otherwise
-  real(dp), parameter :: NaN = O'0777610000000000000000'
+  real(dp), parameter :: NaN = dble(O'0777610000000000000000')
 #endif
 
 end module nan_mod
