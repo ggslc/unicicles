@@ -29,7 +29,7 @@ c                 handling package', sand82-0800, sandia laboratories,
 c                 1982.
 c***routines called  (none)
 c***end prologue  xerabt
-      dimension messg(nmessg)
+      character messg(nmessg)
 c***first executable statement  xerabt
       call exit(1)
       end
@@ -398,7 +398,8 @@ c           print number of other errors
          if (nmessg.lt.0) return
 c        clear the error tables
          do 70 i=1,10
-   70       kount(i) = 0
+            kount(i) = 0
+ 70      continue
          kountx = 0
          return
    80 continue

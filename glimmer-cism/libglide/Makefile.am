@@ -8,7 +8,7 @@ dist_variable_DATA = $(variable_DATA)
 
 nodist_include_HEADERS := $(wildcard *.mod)
 EXTRA_DIST = f90_dep.mak $(RESTART_INC_INS)
-BUILT_SOURCES = glide_io.F90
+#BUILT_SOURCES = glide_io.F90
 CLEANFILES = $(BUILT_SOURCES) f90_dep.mak $(wildcard *.mod)
 
 libglide_la_SOURCES = glide.F90 glide_types.F90 glide_setup.F90 \
@@ -40,8 +40,8 @@ AM_FCFLAGS = $(FC_MODINC)../libglimmer $(FC_MODINC)../libglimmer-solve $(NETCDF_
 #AM_CFLAGS=$(CFORTRAN_CFLAGS)
 
 #some special rules for automatically generating ncdf src code
-%_io.F90:	$(srcdir)/%_vars.def $(top_srcdir)/libglimmer/ncdf_template.F90.in
-		$(PYTHON) $(top_srcdir)/scripts/generate_ncvars.py $^
+#%_io.F90:	$(srcdir)/%_vars.def $(top_srcdir)/libglimmer/ncdf_template.F90.in
+#		$(PYTHON) $(top_srcdir)/scripts/generate_ncvars.py $^
 
 f90_dep_sources = $(srcdir)/*.F90 $(BUILT_SOURCES)
 

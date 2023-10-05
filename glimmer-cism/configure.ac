@@ -32,7 +32,7 @@ if test x"$F77"x == xx ; then
   export F77=$FC
 fi
 # we are building fortran libraries so, let's make them static
-AC_PROG_LIBTOOL
+LT_INIT
 
 AC_PROG_CC
 AC_PROG_CXX
