@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libglimmer.la libglimmer-IO.la
-bin_PROGRAMS  =  nc2config
+#bin_PROGRAMS  =  nc2config
 check_PROGRAMS = test_config test_integrate test_commandline test_ts test_writestats test_filenames
 TESTS = test_filenames
 
@@ -41,7 +41,7 @@ libglimmer_IO_la_SOURCES = glimmer_anomcouple.F90 glimmer_filenames.F90 glimmer_
                           glimmer_writestats.F90 ncdf_utils.F90 writestats.c writestats.h cfortran.h 
 libglimmer_IO_la_LDFLAGS=-all-static
 
-nc2config_SOURCES = nc2config.F90
+#nc2config_SOURCES = nc2config.F90
 
 test_config_SOURCES = test_config.F90
 test_integrate_SOURCES = test_integrate.F90

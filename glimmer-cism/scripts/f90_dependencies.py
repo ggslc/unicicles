@@ -23,7 +23,7 @@
 
 # python script for analysing module dependencies of a number of f90/f95 programs
 
-import string, getopt, sys, os, os.path
+import getopt, sys, os, os.path
 
 external_mod = ['f95_lapack','netcdf','blas_dense']
 external_inc = ['config.inc','cdriverconstants.h']
@@ -33,7 +33,7 @@ def search_file(name):
 
     n = os.path.basename(name)
     result = {}
-    result['name'] = string.replace(n,'.','_')
+    result['name'] = n.replace('.','_')
     result['realname'] = n
     result['modname'] = []
     result['includes'] = []
@@ -46,42 +46,42 @@ def search_file(name):
 
     # parsing file
     for l in file.readlines():
-        l = string.lower(l)
+        l = l.lower()
         # searching for comments and stripping them
-        pos = string.find(l,'!')
-        if pos is not -1:
+        pos = l.find('!')
+        if pos != -1:
             l = l[:pos]
         # finding use statement
-        pos = string.find(l,'use')
-        if pos is not -1:
+        pos = l.find('use')
+        if pos != -1:
             pos = pos+len('use')
-            pos2 = string.find(l,',')
+            pos2 = l.find(',')
             if pos2==-1:
-                module = string.strip(l[pos:])
+                module = l[pos:].strip()
             else:
-                module = string.strip(l[pos:pos2])
+                module = l[pos:pos2].strip()
             if module not in result['uses'] and module not in external_mod:
                 result['uses'].append(module)
             continue
         # finding include statements
-        pos = string.find(l,'include ')
-        if pos is not -1:
+        pos = l.find('include ')
+        if pos != -1:
             pos = pos+len('include ')
-            include = string.strip(l[pos:])
-            if string.find(include,'<') is not -1:
+            include = l[pos:].strip()
+            if include.find('<') != -1:
                 continue
-            include = string.replace(include,'\"','')
-            include = string.replace(include,'\'','')
+            include = include.replace('\"','')
+            include = include.replace('\'','')
             if include  not in result['includes'] and include not in external_inc:
                 result['includes'].append(include)
             continue
         # finding module statement
-        pos = string.find(l,'end module')
-        if pos is not -1:
+        pos = l.find('end module')
+        if pos != -1:
             pos = pos + len('end module')
-            result['modname'].append(string.strip(l[pos:]))
+            result['modname'].append(l[pos:].strip())
             continue
-        if string.find(l,'end program') is not -1:
+        if l.find('end program') != -1:
             result['prog'] = 1
         
     file.close()
@@ -117,15 +117,15 @@ def print_dot(out,files,modules,onlymod=0):
         flags = '[label="%s"'%r['realname']
         if len(r['modname']) > 0:
             flags = flags + ',shape=box'
-        if r['prog'] is 1:
+        if r['prog'] == 1:
             flags = flags + ',color=red'
         flags = flags + ']'
-        if (onlymod is 1 and len(r['modname']) > 0) or onlymod is 0:
-            if r['process'] is 1:
+        if (onlymod == 1 and len(r['modname']) > 0) or onlymod == 0:
+            if r['process'] == 1:
                 out.write( '\t%s %s;\n'%(r['name'],flags))
     for r in files:
-        if (onlymod is 1 and len(r['modname']) > 0) or onlymod is 0:
-            if r['process'] is 1:
+        if (onlymod == 1 and len(r['modname']) > 0) or onlymod == 0:
+            if r['process'] == 1:
                 for mod in r['uses']:
                     if mod in modules.keys():
                         out.write( '\t%s -> %s ;\n'%(r['name'],modules[mod]))
@@ -144,17 +144,22 @@ def print_makefile(out,files,modules,obj_ext):
             out.write("%s "%inc)
         out.write("%s\n"%r['realname'])
 
+
+def log(str):
+
+    print(str)
+        
 def usage():
     "short help message"
-    print 'Usage: f90_dependencies [OPTIONS] f90files'
-    print 'extract module dependencies from set of f90/95 files'
-    print ''
-    print '  -h, --help\n\tthis message'
-    print '  -d, --dot\n\tchange output format to dot (default is Makefile dependencies)'
-    print '  -p file, --process=file\n\tonly processes dependencies for file (more than one can be specified)'
-    print '  -m, --mod\n\tonly process modules (only honour when producing dot)'
-    print '  -l, --libtool\n\tproduce output to be used by libtool'
-    print '  -o file, --output=file\n\twrite to file (default: stdout'
+    log('Usage: f90_dependencies [OPTIONS] f90files')
+    log('extract module dependencies from set of f90/95 files')
+    log('')
+    log('  -h, --help\n\tthis message')
+    log('  -d, --dot\n\tchange output format to dot (default is Makefile dependencies)')
+    log('  -p file, --process=file\n\tonly processes dependencies for file (more than one can be specified)')
+    log('  -m, --mod\n\tonly process modules (only honour when producing dot)')
+    log( '  -l, --libtool\n\tproduce output to be used by libtool')
+    log('  -o file, --output=file\n\twrite to file (default: stdout)')
 
 if __name__ == '__main__':
 
@@ -201,7 +206,7 @@ if __name__ == '__main__':
                 modnames[m] = r['name']
                 modrnames[m] = r['realname']
 
-    if dot is 1:
+    if dot == 1:
         if len(process)>0:
             reduce(process,f90files,modrnames)
             mod = 0
