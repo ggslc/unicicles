@@ -121,7 +121,7 @@ MODULE wrapper_mod
     END DO
 
     !y-axis is expected other way up?!
-    lats=lats*-1
+    lats=-lats
     smb_gcm=smb_gcm(:,il_jm:1:-1,:)
     icestemp_gcm=icestemp_gcm(:,il_jm:1:-1,:)
     iceareas_gcm=iceareas_gcm(:,il_jm:1:-1,:)
