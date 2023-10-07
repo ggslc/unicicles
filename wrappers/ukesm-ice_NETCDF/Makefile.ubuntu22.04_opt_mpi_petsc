@@ -1,0 +1,36 @@
+
+BIKE_DIR=$(BISICLES_HOME)/bisicles-uob
+BIKE_CONFIG=2d.Linux.64.mpiCC.mpif90.DEBUG.OPT.MPI.PETSC
+HDF_DIR=/usr/lib/x86_64-linux-gnu/hdf5/openmpi/
+CDF_DIR=/usr
+Z_DIR=/usr
+GLIM_DIR=$(BISICLES_HOME)/unicicles/glimbike-parallel
+FC=mpif90
+
+CDF_INC=-I$(CDF_DIR)/include
+CDF_LIBS=-L$(CDF_DIR)/lib -L$(HDF_DIR)/lib -L$(Z_DIR)/lib -lnetcdff -lnetcdf -lhdf5_hl -lhdf5 -lz 
+BIKE_LIBS=-L$(BIKE_DIR)/code/lib  -lBisicles$(BIKE_CONFIG) -lChomboLibs$(BIKE_CONFIG) -L$(PETSC_DIR)/lib -Wl,-rpath,$(PETSC_DIR)/lib  -lpetsc -lHYPRE -lflapack -lmpi_cxx -lfblas -lstdc++ -lpython3.10
+
+GLIM_INC=-I$(GLIM_DIR)/include
+GLIM_LIBS=-L$(GLIM_DIR)/lib -lglint -lglide -lglimmer -lglimmer-solve -lglimmer-IO -lblas
+
+all:	wrapper
+
+OBJS=wrapper_mod.o gl_mod.o wrapper_main.o
+
+FCFLAGS=-DNO_RESCALE
+
+wrapper:  $(OBJS)
+	$(FC)  -o wrapper $(OBJS) $(GLIM_LIBS) $(BIKE_LIBS) $(CDF_LIBS)
+
+gl_mod.o:gl_mod.f90
+	$(FC) $(FCFLAGS) -g -free $(GLIM_INC) $(CDF_INC) -c gl_mod.f90
+
+wrapper_mod.o:wrapper_mod.f90
+	$(FC) $(FCFLAGS) -g -free $(GLIM_INC) $(CDF_INC) -c wrapper_mod.f90
+
+wrapper_main.o:wrapper_main.f90
+	$(FC) $(FCFLAGS) -g -free -c wrapper_main.f90
+
+clean:
+	rm -f *.o *.mod
