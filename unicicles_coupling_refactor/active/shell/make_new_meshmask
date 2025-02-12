@@ -1,0 +1,31 @@
+#/bin/bash
+
+set -e
+
+cd $CYLC_TASK_WORK_DIR
+
+for i in *; do 
+  if [ -L $i ]; then
+    rm $i
+  fi 
+done
+
+ln -s $UNICICLES_BATHY_OUT_NC isf_draft_meter.nc
+ln -s $UNICICLES_BATHY_OUT_NC bathy_meter.nc
+
+ln -s $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/iodef.xml .
+ln -s $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/field_def.xml .
+ln -s $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/domain_def.xml .
+ln -s $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/coordinates.nc .
+
+#ln -s $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/namelist_ref .
+#ln -s $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/namelist_cfg .
+ln -s /projects/ukesm/rsmith/NEMO4/nemo_r15198/tools/DOMAINcfg/namelist_ref .
+ln -s /projects/ukesm/rsmith/NEMO4/nemo_r15198/tools/DOMAINcfg/namelist_cfg .
+
+echo "newt version $NEMO_DOMAINCFG"
+
+rose mpi-launch $NEMO_DOMAINCFG
+
+echo "copy mesh_mask to $UNICICLES_MESHMASK_OUT_NC"
+cp mesh_mask.nc $UNICICLES_MESHMASK_OUT_NC

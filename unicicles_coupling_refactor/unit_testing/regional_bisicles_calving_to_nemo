@@ -1,0 +1,17 @@
+KG_DIR=kg_ioput
+TEST_DIR=output
+ISCRIPDIR=../active/python3
+
+export PYTHONPATH=$PYTHONPATH:$ISCRIPDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/work/n02/n02/marc/python/software/unicicles-env_230620/lib
+
+POSTICE_ICE_PLOT=$KG_DIR/bisicles_db851c_19850101_plot
+
+PRECAP_ICEANCIL=$TEST_DIR/bisicles_db851c_19850101_orog-hi
+UNICICLES_CALVING_OUT=$TEST_DIR/bisicles_db851c_P1Y_19840101-19850101_calving
+
+UNICICLES_PERIOD_SECONDS=31104000
+
+python $ISCRIPDIR/regional_bisicles_calving_to_nemo.py --hdf5_input ${POSTICE_ICE_PLOT}-GrIS.hdf5 --hdf5_output ${UNICICLES_CALVING_OUT}-GrIS.hdf5 --nc_output ${UNICICLES_CALVING_OUT}-GrIS.nc --coupling_period $UNICICLES_PERIOD_SECONDS --region GrIS
+
+python $ISCRIPDIR/regional_bisicles_calving_to_nemo.py --hdf5_input ${POSTICE_ICE_PLOT}-AIS.hdf5 --hdf5_output ${UNICICLES_CALVING_OUT}-AIS.hdf5 --nc_output ${UNICICLES_CALVING_OUT}-AIS.nc --coupling_period $UNICICLES_PERIOD_SECONDS --region AIS

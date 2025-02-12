@@ -1,0 +1,12 @@
+KG_DIR=../kg_ioput
+TEST_DIR=output/
+ISCRIPDIR=../../active/python3_legacy
+
+export PYTHONPATH=$PYTHONPATH:$ISCRIPDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/work/n02/n02/marc/python/software/unicicles-env_230620/lib
+
+PREICE_UM_PP=$KG_DIR/db851a.pz19840101
+POSTICE_COUPLE_UM=$TEST_DIR/atmos_db851c_P1Y_19840101-19850101_icecouple.nc
+
+
+python $ISCRIPDIR/ukesm_to_bike.py  --input $PREICE_UM_PP --output $POSTICE_COUPLE_UM

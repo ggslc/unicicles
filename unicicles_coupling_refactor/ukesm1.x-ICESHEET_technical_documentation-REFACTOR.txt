@@ -1,0 +1,282 @@
+This document describes the technical means by which a climate model (HadGEM3-GC3.1, or UKESM1) (including the Unified Model atmosphere, NEMO ocean and CICE sea-ice) is coupled to BISICLES in UKESM1.3
+
+BISICLES is strictly the dynamic core of the icesheet model. In UKESM1 versions with interactive ice sheets the icesheet model as a whole is referred to as UniCiCles (Uni(fied Model), CI(SM), (BISI)CLES), since BISICLES is wrapped in additional code (much of it from the Glimmer-CISM model, as present in the open-source release of CESM 1.2.0). As the major function of these wrapper layers is to transform climate information into boundary conditions for the ice dynamics, they will here be treated as part of the "coupling" and included in this description.
+
+NB: much of the UKESM atmosphere/land--ice coupling derives from a similar scheme employed to couple an older version of the UM (vn4.5, in a coarse resolution configuration called FAMOUS), to an older version of the ice (Glimmer). Some idiosyncratic features of the present scheme may be traced back to the requirements of these models. This document describes the workflow used for UKESM1.3, which is a systematic refactor of the original, somewhat adhoc, system used in all previous versions, including UKESM1.ice, UKESM1.x-ice and UKESM1.2. Some idiosyncratic features of the present scheme may be traced back to the requirements of those models.
+
+Overview
+========
+
+HadGEM3/UKESM and BISICLES pass information to each via filesystem coupling. There are a number of structural and practical features of all the models involve that make this the most straightforward way to couple, and the monthly->annual coupling frequency of the icesheet makes it not especially inefficient.
+
+A typical cycle proceeds as follows. UKESM1.x suites with interactive ice (since roughly u-[c-z]????) run the climate and ice sheet models in parallel for a given simulation year, each using boundary conditions meaned over/from the end of the previous year's run of the other model. When HadGEM3/UKESM runs its portion of the cycle, annual mass and heat fluxes at the base of the JULES's (JULES is the land model in HadGEM3/UKESM) snowpacks for icesheet regions are accumulated (using STASH), and written out to disk in the same way as other model output. NEMO writes out monthly mean water and heat fluxes at the base of floating ice shelves - these are processed into an annual mean by coupling scripts described below. Each year of ice sheet simulation requres that the following tasks (with their corresponding app and script names) are run
+
+1)  ocean_to_regional_ice_sheet (ic_ocean_to_ice, nemo*_to_regional_bisicles.py)
+2)  ice_sheet (ic_ice_sheet, unicicles)
+3)  regional_ice_sheet_calving_to_ocean (ic_ice_to_calv, regional_bisicles_calving_to_nemo.py)
+4)  regional_ice_sheet_topo_to_ancil (ic_ice_to_ancil, regional_unicicles_topo_to_cap.py)
+5)  regional_ancil_topo (ic_ancil_gen, capOrog)
+6)  ice_sheets_to_ocean (ic_ice_to_ocean, bisicles_global_to_nemo.py)
+7)  ice_sheets_ancils_to_atmos (ic_ice_to_atmos, unicicles_cap_global_to_um.py)
+8)  atmos_to_ice_sheets (ic_atmos_to_ice, um_to_unicicles.py)
+9)  ocean_copy_for_ice (unicicles_copy_nemo.sh)
+10) ocean_average_for_ice (unicicles_average_nemo.sh)
+
+
+Following a principle used elsewhere in suite design, the app and task names are generic to the function performed, the script name is specific with respect as to which model components it is written to cater for. app naming has been designed so icesheet coupling steps appear clustered together for users, especially when accessed via the gui.
+
+At the end of each year of climate or ice sheet simulation, the models pause while the other gets to the end of its year and the final processing is done on the boundary conditions that need to be exchanged before the next year of simulations can proceed. In a normal configuration, the ice sheet year runs much more quickly than a climate year, so the ice sheet is made to wait for the climate to catch up.
+
+The suite can be run with either GrIS or AIS as the only active ice sheet if desired. The tasks are now refactored so that each task deals with either atmosphere<->ice or ocean<->ice coupling, independently: there is no switch in the suite to disable these pathways, a new graph.rc has to be drawn up to create a partially coupled model in this way (as well as other changes made to provide the now-missing boundary conditions), but the scripts themselves should not have to be changed.
+
+1,8-10) are tasks that call scripts to prepare climate model output into the formats and domains required for input to UniCiCles. 3-7) are tasks which process the icesheet output and modify climate model input files. 6) runs part of the UM's CAP (Central Ancillary Program) to calculate the additional orography boundary conditions required by the UM. UniCiCles is run with a separate regional instance for each icesheet, and each region will run its own set of tasks 1-5), before the regional outputs are reunified into global fields for the UM and NEMO/CICE in 6,7). 
+
+The HadGEM3/UKESM cycle runs its usual postproc and housekeeping apps. A separate postproc task, postproc_ice, archives and deletes the UniCiCles output as appropriate. Housekeeping and clearout clean the temporary work spaces of the ice and coupling tasks just as for the UM and NEMO
+
+As noted above, this document will treat the parts of UniCiCles that wrap BISICLES as part of the coupling. We may thus further split the unicicles app 2) above into
+
+2a) unicicles_wrapper
+2b) ukesm_netCDF
+2c) glint_gcm
+2d) BISICLES
+
+These are NOT separate tasks in the rose/cylc cycle, but one executable made by linking distinct libraries written with distinct functions. These will be described separately here.
+
+Initialisation Tasks
+====================
+
+Two tasks not listed above should be carried out by the suite during initialisation. These are not part of a climate--ice coupling cycle
+
+i) ice_sheet_setup  (<suite>/bin/setup_unicicles.sh)
+---
+
+This bash script runs once, at the start of a new simulation. This creates the UNICICLEShist shared directory that will be used to hold all files required to be shared between the tasks and the model output to be archived. If this directory already exists, it will be renamed using the current system date and time, and a new, empty directory created. It also creates links to archived restart files and boundary conditions required to run the first year of ice sheet simulation before the climate model has run its first year, and the bathymetry and iceberg calving boundary conditions that NEMO will need for its first year.
+
+ii) fcm_make_unicicles
+--
+There is also a BUILD_UNICICLES switch in the suite.rc, which must be set True at least once for each suite so the fcm_make_unicicles can make the icesheet model and coupling scripts available to the suite. fcm_make_unicicles CANNOT checkout and build the full icesheet model from scratch (as is done for the UM and NEMO/CICE) - due to the nature of the BISICLES, Chombo and Glimmer-CISM builds and the limitations of fcm_make, these basic libraries for the icesheet must already be compiled and installed on the running platform. fcm_make_unicicles requires the paths to these libraries to be specified in its configuration. fcm_make_unicicles builds the unicicles wrapper that brings the ice libraries together, and fetches the specified revision of the coupling scripts that enable unicicles to talk to the climate model. One of the coupling scripts also relies on a library routine derived from the JULES snow model - the compilation of this library is also carried out by fcm_make_unicicles.
+
+Cycle tasks
+===========
+
+1)  ocean_to_regional_ice_sheet (ic_ocean_to_ice, nemo3.6_to_regional_bisicles.py)
+---
+
+python script, dependent on cf-python, external nctoamr exec (a BISICLES filetool) and pre-computed grid definition files [cf_gridfile_BISICLES_lev0_<region>.nc,cf_gridfile_eORCA.nc,x_bike_<region>.dump,y_bike_<region>.dump]
+
+UniCiCles uses Glint to process the /surface/ forcing for the icesheet, which it expects on the global UM grid, with optional elevation tiles. However, information for input to directly to BISICLES must be presented on one of the same regional domain grids as that instance of the ice. In UKESM1, only ocean-iceshelf exchange fields (/basal/ forcing for the floating shelves) are presented directly to BISICLES. Each instance of BISICLES will run a copy of this task for its own domain, regridding the global output from ocean_average_for_ice onto its local domain. It creates a BISICLES hdf5 boundary condition file.
+
+files:
+--input the meaned, rebuilt netCDF output from ocean_average_for_ice
+--output the same but in hdf5, regridded onto the local BISICLES grid
+
+variables input (units) [NEMO name]:
+ice->ocean water flux (kg/m^2/s) [ice_shelf_melting]
+ice->ocean heat flux (J/m^2/s) [ice_shelf_heat_flux]
+
+variables output (units) [BISICLES name]:
+ice->ocean water flux (m/yr) [melt_water]
+ice->ocean heat flux (J/m^2/yr) [melt_heat]
+
+2)  ice_sheet (ic_ice_sheet, unicicles)
+---
+
+As already noted, UniCiCles can be thought of as a dynamic model of ice flow (BISICLES) wrapped in code that turns climate model information into boundary conditions for the dynamics. Whilst the coupling provides some fields directly to BISICLES in the format it requires, the main icesheet surface boundary conditions are processed by these wrappers. glint_gcm, the ukesm_NETCDF wrapper and BISICLES form one executable, although they are separate source codes from separate repositories, compiled into separate object libraries.
+
+In addition to the coupling fields written out by the ukesm_NETCDF wrapper described below, a number of other files are read and written by UniCiCles. The Glint and BISICLES stages of UniCiCles need separate restart files, and produce their own output data and restart states. The information in the Glint files can be essentially be ignored as the BISICLES data supersedes it in the running model, although the system requires the presence of a correctly dimensioned and formatted Glint restart state to initialise.
+
+2a) unicicles_wrapper (fcm_make_unicicles/unicicles/bin/unicicles_wrapper)
+---
+
+bash script, dependent on external cdo utility
+
+This script uses the information in the unicicles rose-app.conf to build the various input namelists in the various formats required by the ice model layers to follow. This includes detecting whether this call to the ice should be initialised anew, or is part of an ongoing run and specifying restart or initialisation files accordingly BUT IT SHOULD NOT, WE SHOULD MOVE THIS FUNCTION TO SETUP_UNICICLES. The main UniCiCles exec is then launched. After UniCiCles exits, unicicles_wrapper renames and moves the BISICLES output and state files to the coupled model's common directory, and extracts the last glint state to use for restart on the next call.
+
+2b) ukesm_NETCDF wrapper
+---
+
+Fortran 90 (fcm_make_unicicles/unicicles/extract_wrapper/wrapper: gl_mod.f90, wrapper_main.f90, wrapper_mod.f90)
+
+The Glimmer-CISM interface (glint_gcm) for supplying climate information to the icesheet is designed to be built directly into the host climate model. ukesm_NETCDF is one of a set of wrappers in the UniCiCles repository that provides the ability to initialise and run glint_gcm and a dynamical ice core standalone - specifically, ukesm_NETCDF reads information from netCDF files containing information from ukesm that has been reformatted via the process_atmos_for_ice app.
+
+- the namelist in file gcm_params is read (wrapper_read_namelist), containing basic global grid and coupling interval information from the climate model, and the input and output file names. Arrays are allocated (wrapper_allocate)
+
+- the file written by process_atmos_for ice is read (wrapper_read_ncdf). The namelist variable temp_upper_bc controls whether the ice will be given a surface temperature or a heat flux as a surface boundary condition. We also replace missing_value flags with 0 and reorder the meridional axis of the data to conform to glint's expectations.
+
+- glint and BISICLES are initialised (initialised_glint_gcm) and stepped (glint_gcm).
+
+- information processed by glint for the climate model is output (wrapper_write_ncdf). Some variables are single numbers, some are the average for a whole climate model gridbox, some are the average for an elevation tile in a climate model gridbox.
+
+- the model is ended
+
+variables read in (units) [unicicles_wrapper name]:
+ice tile surface area (m^2) [tile_surface_area]
+ice tile fraction (no_unit) [tile_frac]
+ice tile mass balance (kg/m^2/s) [ice_smb]
+non-ice tile snowpack mass (m) [nonice_snowdepth]
+ice tile snow-subsurface temperature (C, temp_upper_bc==0) [ice_stemp]
+ice tile snow->snow-subsurface heat flux (W/m^2, temp_upper_bc==1) [snow_ice_hflux]
+
+variables written out (units) [unicicles_wrapper name]:
+total icesheet volume (m^3) [total_ice_volume]
+total change in ice volume over this step (m^3) [change_in_ice_volume]
+accumulated gridbox mean ice calving flux (m/yr) [cell_calving_flux]
+gridbox mean orographic height (m) [surface_elevation]
+the fraction of a gridbox that exists in a given elevation class (no unit) [tile_land_fraction]
+the fraction of the gridbox in a given elevation class that is glaciated (no unit) [tile_ice_fraction]
+the change in the depth of snow on the non-glaciated part of the land in a given elevation class (m) [nonice_snowdepth]
+the flux of heat between the skin of the icesheet and the surface above (W/m^2, temp_upper_bc==0) [snow_ice_hflux]
+the surface temperature of the ice (C, temp_upper_bc = 1) (ice_stemp]
+
+Neither the gridbox mean orographic height or the ice calving fields written out by the wrapper are used in the UKESM1 coupling, as this information is obtained directly from BISICLES in a later stage. Currently, the heat flux coupling between JULES and BISICLES is disabled, so along with the information about changes in BISICLES ice volume, these fields are only of diagnostic interest.
+
+2c) glint_gcm 
+---
+
+glint_gcm (see fcm_make_unicicles/extract_wrapper/wrapper/Makefile for locations of Glimmer and BISICLES source code) was originally written to allow the Glimmer-CISM icesheet model to be coupled to the CCSM climate model. Its capabilities are thus rather wider than we use here, and include accumulating and meaning the climate model information and deciding when to call the ice dynamics. In UKESM1-IS, we use only the regridding functionality of glint_gcm.
+
+glint_gcm accepts mass balance and heat flux fields on the climate model grid, optionally expressed in a pseudo-vertically layered stack of such grids, each layer representing the climate variables at a different altitude. Each 2D lon-lat layer is bilinearly interpolated in the horizontal onto the centres of the 2D icesheet grid, and then a value is obtained for the particular altitude of the icesheet surface at each gridpoint by interpolating in the vertical between the appropriate layers in the stack of 2D layers.
+
+A different procedure is followed when regridding icesheet information back onto the climate model grid. Again, the icesheet grid is treated as representing point information at the centres of the cells, and these are binned and averaged into the climate gridboxes that contain that location. This binning can optionally also consider the altitude ranges represented by each layer in the pseudo-vertical stack of 2D climate grids, and glint may bin and average the ice data into the relevant vertical layer as well. When averaging the binned fields, Glint knows that its domain may only partly cover some climate model grid cells - either because the boundaries of the climate model and ice grids are not perfectly congruent, or because a limit has been put on the region of the ice domain which may communicate to the climate model (via Glint's outmask field). The binned averages supplied back to the climate model take this into account, and additionally allow for information from multiple separate Glint instances to be weighted and combined together, although we do not use this latter functionality.
+
+glint_gcm is called from the wrapper above. It reads its controlling namelists, as specified in top.config, and a restart state. The state information in the restart (and some of the science choices in the namelists) are overwritten by the BISICLES restart, should one exist, but the restart file must be present and dimensioned correctly to allow glint to initialise. The variables passed into glint_gcm  go through the general purpose accumulation, averaging, unit conversion and dynamic-controlling-logic stages used as part of CCSM, but units aside, the variables pass through unchanged and the ice dynamics is always called.
+
+The icesheet mass balance, surface heat boundary condition and non-ice snowpack depth fields from the climate model are all regridded in 3D to the icesheet surface, as described above. The linear interpolation to the icesheet grid is non-conservative, and the climate model tile fractions and surface areas may be used in the regridding to enforce conservation, both locally with respect to the pseudo-vertical column associated with each horizontal climate model location, and via a further correction to the entire region covered by each instance of the icesheet.
+
+The coupling allows new ice area to be formed through sufficiently positive mass balance on non-glaciated surface tiles. Where the icesheet grid representation of the non-ice snowpack depth exceeds a critical threshold (depth_snow2ice, hardcoded in Glint) for a location that is not already glaciated in the icesheet model, new ice equivalent to that depth of snow is created. Conversely, where the thickness of ice on the icesheet grid is less than this threshold, it is removed from the icesheet model. These conversions are communicated to the climate model by modifying the representation of the non-ice snowdepth field on the icesheet grid before rebinning it back onto the climate model grid. In fact, once the non-ice snowdepth field has been used at the start of the icesheet step to determine whether the snow depth exceeds the critical threshold for forming new ice gridboxes, the array is set to zero everywhere and is henceforth used to hold only the *changes* that need to be applied to the non-ice snowdepth in the climate model as a result of creating or removing ice that has crossed the threshold. In UKESM1, the creation and removal of ice from BISICLES in this process is done by modifying the rate of the surface mass balance field. This modification is done at the start of the BISICLES timestep (when BISICLES is not used as the dynamic core in the icesheet model, this creation and removal of ice is done otherwise, by direct manipulation of the icesheet state at the start and end of the ice coupling interval - both mechanisms are implemented in the current version of glint_gcm and should not be confused on inspection of the code).
+
+files used by Glint:
+input:
+a generic namelist top.config, and an instance-specific namelist, <domain>.config
+an instance-specific restart (hotstart) file
+output:
+an accumulating, instance-specific hotstart file. The last state written to this is used to restart the model on the next cycle.
+
+files used by BISICLES:
+input:
+an instance-specific namelist bisicles-<domain>.input
+an instance-specific restart file chk.<date>.<domain>.<timestep>.hdf5
+output:
+instance-specific output files plot.<date>.<domain>.<timestep>.hdf5
+instance-specific restarts file chk.<date>.<domain>.<timestep>.hdf5
+
+3) regional_ice_sheet_calving_to_ocean (ic_ice_to_calv, regional_bisicles_calving_to_nemo.py)
+---
+
+python script, dependent on amrfile, pyproj, cf-python, mule and external cdo utility
+
+The plot.*hdf5 output directly from BISICLES on its own grid is read in and the field of accumulated calved ice is processed. The field is nearest-neighbour regridded (it is not an area-average) onto the NEMO grid and routed to the nearest (treating the NEMO array as uniform) open-ocean gridbox to act as a source term for NEMO's Lagrangian iceberg scheme. The same BISICLES field is used to produce a file containing a sink term that will remove this calved ice from BISICLES over the next cycle.
+
+files
+--hdf5_input the final instance-specific ice output file, plot.<date>.<domain>.<timestep>.hdf5
+--hdf5_output iceberg sink file for bisicles melange on next run bisicles_<runid>c_<coupling_period>_<startdate>-<enddate>_calving.hdf5
+--nc_output iceberg source file for NEMO on next run bisicles_<runid>c_<coupling_period>_<startdate>-<enddate>_calving.nc
+
+
+
+4)  regional_ice_sheet_topo_to_ancil (ic_ice_to_ancil, regional_unicicles_topo_to_cap.py)
+---
+python script, dependent on amrfile, pyproj, cf-python, mule and external cdo utility
+
+The plot.*hdf5 output directly from BISICLES on its own grid is read in and used to create a high-resolution UM-format ancillary file containing the current icesheet topography. This ancil will be used by regional_ancil_topo to create the mean orography and subgridscale orographic statistics needed by the UM.
+
+
+files
+--hdf5_input the final instance-specific ice output file, plot.<date>.<domain>.<timestep>.hdf5
+--um_input a template UM ancil format high resolution orography for the region
+--um_output UM ancil format high resolution orography from BISICLES bisicles_<runid>c_<date>_orog-hi
+
+
+5)  regional_ancil_topo (ic_ancil_gen, capOrog)
+---
+requires the UM Central Ancillary Program (CAP) to have been installed on the host system
+
+This app runs two tasks that have been extracted from standard configurations of CAP suites (ancilTop and ancilOrog). They read in the regional high-resolution UM-format file of the icesheet topography produced by process_ice_hdf and produce a (still regional) set of fields if the orographic mean and statistics at the resolution required by the UM in the suite. Some filtering of the orography, appropriate to the target grid resolution, is applied, such that this gridbox mean topography, used by the UM dynamics, may no longer be entirely consistent with the summed tile-fractions of the elevation tiles calculated by glint_gcm in 2c)
+
+The namelists in the main rose-app.conf are generic for any region at the given grid resolution, but the task needs to be invoked with ROSE_APP_OPT_CONF_KEYS=[GrIS|AIS] to pick up the relevant grid definitions from the opt directory for the icesheet being processed
+
+file in:
+bisicles_<runid>c_<date>_orog-hi is the high-resolution UM-format icesheet surface topography
+
+file out:
+bisicles_<runid>c_<date>_orog-lo is a UM ancil at the resolution for the climate run containing the gridbox mean orography and subgridscale statistics required by the UM
+
+
+6)  ice_sheets_to_ocean (ic_ice_to_ocean, bisicles_global_to_nemo.py)
+---
+
+python script, dependent on BISICLES amrfile module
+
+python script that creates the global bathymetry and ice-draft boundary files NEMO will use when next submitted. For this it uses the hdf5 output from the AIS instance of unicicles directly. It also unifies the regional iceberg calving seed files produced by each instance of regional_ice_sheet_calving_to_ocean into a global file that NEMO can use. This first function is complicated, see the full write up at https://docs.google.com/document/d/18HFmA8aLlYi3lNNRMXiffHPThekBTU2QNqcP-sxzegY
+
+files in:
+--input_berg_GrIS, --input_berg_AIS: one or both of the regional iceberg seeds output from process_ice_hdf
+--input_berg_global: a reference global iceberg seed file from an uncoupled run
+--hdf5_input: the BISICLES AIS hdf5 output from this year
+--nc_template: a file containing a template for the global NEMO bathymetry and ice shelf draft
+
+files out:
+--output_berg_global: a merged global iceberg seed file for NEMO
+--nc_output: the global bathymtry and ice shelf draft file
+
+7)  ice_sheets_ancils_to_atmos (ic_ice_to_atmos, unicicles_cap_global_to_um.py)
+---
+
+python script, dependent on mule, cf-python
+
+python script that takes the regional CAP orography files and Glint icecouple outputs from previous stages, unifies them into global fields and modifies the UM dump that will be used to restart the climate model when it is next submitted. In order, it
+
+- unifies the regional inputs
+- inserts the orography fields from regional_ancil_topo  
+- updates the tile fraction fields on the icesheets (how much land is in each elevation class and whether it is glaciated or not)
+- resets the (nominal) snowpack mass on the glaciated tiles to ensure that there will be enough to calculate the ice sheet SM in the next coupling period
+- adjusts the (real) snowpack properties on non-glaciated icesheet tiles to conserve mass as Unicicles makes/destroys ice points on its grid. This makes use of a library of snowpack routines cut from JULES vn3.3. It may also produce a term that is required to be added to next year's SMB for the ice. Since UM output diagnostics cannot be modified whilst it is not running, this routine may start the file for next year's SMB coupling, in advance of process_ukesm_for_ice running at the next coupling point
+-updates the temperature boundary condition on the glaciated tiles according to the icesheet heat fluxes if this scheme is being used
+
+files:
+--input_orog_[GrIS|AIS]: regional orography files from CAP
+--input_icecouple_[GrIS|AIS]: regional bisicles_icecouple file containing changes to tile fractions and snow burden
+--um_ref_input: name of source of UM reference fields
+--um_input: name of UM dump to be modified
+--toice_input: atmos_iceouple file containing SMB given to UniCiCles
+--tonextice_output: atmos_icecouple file for next year to hold any overflow SMB from tile fractions rearranging
+--input_new_landseamask: experimental, change land-sea mask in dump to this
+
+--um_output: modified UM dump
+
+
+8)  atmos_to_ice_sheets (ic_atmos_to_ice, um_to_unicicles.py)
+---
+
+python script, dependent on cf-python.
+
+The annual mean pp output from the UM is read and a netCDF file for input to UniCiCles is made. These are data that will be further processed by glint_gcm (2b), and are still on the UM global longitude-latitude-elevation_tile grid - no regridding is done yet.
+
+files:
+--input <run_id>a.py<date_at_start_of_interval>.pp
+--output atmos_<run_id>c_<meaning_period>_<start_date>-<end_date>_icecouple.nc
+
+variables read in (units) [STASHcode]:
+mean orography (m) [m01s00i033]
+land fraction at coast (no unit) [m01s03i395]
+tile fractions (no unit) [m01s03i317]
+snowpack mass (kg/m^2) [m01s08i236]
+snow-subsurface temperature (K) [m01s08i576]
+snowpack->snow-subsurface heat flux (W/m^2) [m01s08i577]
+snowpack mass balance (kg/m^2/s) [m01s08i578]
+
+variables written out (units) [unicicles_wrapper name]:
+ice tile surface area (m^2) [tile_surface_area]
+ice tile fraction (no unit) [tile_frac]
+ice tile mass balance (kg/m^2/s) [ice_smb]
+non-ice tile snowpack depth (m) [nonice_snowdepth]
+ice tile snow-subsurface temperature (C) [ice_stemp]
+ice tile snow->snow-subsurface heat flux (W/m^2) [snow_ice_hflux]
+
+9)  ocean_copy_for_ice (unicicles_copy_nemo.sh)
+---
+bash script in the suite which runs after every *climate* cycle and copies the output file containing shelf basal conditions to the UNICICLEShist directory so the coupling will have them available as necessary, regardless of how NEMO postprocessing or housekeeping is set
+
+10) ocean_average_for_ice (unicicles_average_nemo.sh)
+---
+bash script in the suite which runs after all the climate cycles required before ice sheet coupling have happened. Extracts the ice shelf melt and heat flux variables from the files copied by ocean_copy_for_ice and constructs their time mean for handing to BISICLES

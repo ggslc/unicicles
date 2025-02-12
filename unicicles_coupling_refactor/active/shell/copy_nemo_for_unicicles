@@ -1,0 +1,40 @@
+#/bin/bash
+
+set -e
+
+NEMO_REBUILD=$OCOUPLE_REBUILD
+REBUILD_NEMO=$OCOUPLE_REBUILD_NEMO
+ocean_output_pattern=$OCOUPLE_PATTERN
+
+nfiles=`ls $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/*${ocean_output_pattern}*.nc | wc -l`
+
+if [ $nfiles -gt 0 ]; then
+
+  echo "target is ${UNICICLES_DATAM}"
+  echo "found `ls $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/*${ocean_output_pattern}*.nc`"
+
+  #nemo_rebuild'ing (if nec), copy output files that will be needed to ${UNICICLES_DATAM}
+  #THIS ONLY WORKS WITH 1 MONTH PER COUPLED TASK< WHICH IS OFTEN NOT TRUE
+#  if [ $NEMO_REBUILD -gt 0 ]; then
+#
+#   nfiles= `ls $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/*${ocean_output_pattern}_0[0-9]*.nc | wc -l`
+#   stem  = `ls $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/*${ocean_output_pattern}_0*.nc | head -1 | sed s/_0[0-9]*.nc//`
+#   echo "rebuilding $REBUILD_NEMO $stem $nfiles"
+#   $REBUILD_NEMO $stem $nfiles
+#
+#    mv "${stem}.nc" ${UNICICLES_DATAM}
+#
+#  else
+
+    echo "copying all"
+    cp $CYLC_TASK_WORK_DIR/../$OCOUPLE_TASK/*${ocean_output_pattern}*.nc ${UNICICLES_DATAM}
+
+#  fi
+
+else
+
+  echo "no files matching ${ocean_output_pattern} found, nothing to do"
+
+fi
+
+exit 0

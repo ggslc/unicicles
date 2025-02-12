@@ -1,0 +1,13 @@
+KG_DIR=../kg_ioput
+TEST_DIR=output/
+ISCRIPDIR=../../active/python3_legacy
+
+export PYTHONPATH=$PYTHONPATH:$ISCRIPDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/work/n02/n02/marc/python/software/unicicles-env_230620/lib
+
+POSTICE_ICE_PLOT_HDF=$KG_DIR/bisicles_db851c_19850101_plot-AIS.hdf5
+NEMO_REF_BATHY=$KG_DIR/bathy_remove-000_match_wrap-eORCA1.nc
+
+UNICICLES_BATHY_OUT_NC=$TEST_DIR/bisicles_db851c_19850101_bathymetry-isf.nc
+
+python $ISCRIPDIR/rebin_BIKE_to_eORCA_anom-ACTIVE.py --hdf5_input $POSTICE_ICE_PLOT_HDF --nc_output $UNICICLES_BATHY_OUT_NC --nc_template $NEMO_REF_BATHY
