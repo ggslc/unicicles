@@ -1,0 +1,23 @@
+KG_DIR=../kg_ioput
+TEST_DIR=output/
+ISCRIPDIR=../LINK_TO_OLD_SCRIPTS
+LDLIBPATH=../LINK_TO_LDLIBRARY
+
+export PYTHONPATH=$PYTHONPATH:$ISCRIPDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LDLIBPATH
+
+
+PREICE_UM_DUMP=$KG_DIR/db851a.da19850101_00
+UM_REF_FIELDS=$KG_DIR/ch170a.da28950101_00
+POSTICE_COUPLE_UM=$KG_DIR/atmos_db851c_P1Y_19840101-19850101_icecouple.nc
+POSTICE_COUPLE_ICE=$KG_DIR/bisicles_db851c_P1Y_19840101-19850101_icecouple.nc
+POSTCAP_UMANCIL=$KG_DIR/bisicles_db851c_19850101_orog-lo
+
+POSTICE_UM_DUMP=$TEST_DIR/db851a.da19850101_00-ice
+NEXTICE_COUPLE_UM=$TEST_DIR/atmos_db851c_P1Y_19850101-19860101_icecouple.nc
+
+UNICICLES_PERIOD_SECONDS=31104000
+
+#python $ISCRIPDIR/bike_to_ukesm.py --um_input $PREICE_UM_DUMP --um_ref_input $UM_REF_FIELDS --toice_input $POSTICE_COUPLE_UM --fromice_input ${POSTICE_COUPLE_ICE} --fromcap_input $POSTCAP_UMANCIL --um_output $POSTICE_UM_DUMP --tonextice_output $NEXTICE_COUPLE_UM --coupling_period $UNICICLES_PERIOD_SECONDS --fix_polarrow_landfrac 1
+
+python $ISCRIPDIR/bike_to_ukesm.py --um_input $PREICE_UM_DUMP --um_ref_input $UM_REF_FIELDS --toice_input $POSTICE_COUPLE_UM --fromice_input ${POSTICE_COUPLE_ICE} --fromcap_input $POSTCAP_UMANCIL --um_output $POSTICE_UM_DUMP --tonextice_output $NEXTICE_COUPLE_UM --coupling_period $UNICICLES_PERIOD_SECONDS

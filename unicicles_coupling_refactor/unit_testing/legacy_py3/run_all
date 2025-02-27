@@ -1,0 +1,27 @@
+export MULE_DIR=/common/internal/umdir/mule/mule-2023.08.1/python-3.7.0_numpy-1.20.2/openmp
+export JULES_SNOW_LIB=/home/users/robin.smith/unicicles_src/unicicles_coupling_refactor/active/fortran
+export UNICICLES_CONDA_ENV=/home/users/marc.stringer/python/software/unicicles-env_241129
+
+set +u;
+source ${UNICICLES_CONDA_ENV}/bin/activate; 
+module swap PrgEnv-cray/8.3.3 PrgEnv-gnu/8.3.3; 
+export PATH=${PATH}:${MULE_DIR}/bin:.
+export PYTHONPATH=${MULE_DIR}/lib
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${UNICICLES_CONDA_ENV}/lib:${JULES_SNOW_LIB};
+
+#./ukesm_to_bike
+#
+#./regrid_eORCA_to_BIKE
+##./regrid_NEMO4.2_to_BIKE
+#
+./bike_regrid_hdf5
+##./bike_regrid_hdf5-noUM
+#
+#./global_from_regional
+#
+#./rebin_BIKE_to_eORCA_anom
+##./rebin_BIKE_to_eORCA_anom-ACTIVE
+#
+#./bike_to_ukesm
+##./bike_to_ukesm_RESETSNOW
+

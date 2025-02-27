@@ -1,9 +1,10 @@
 KG_DIR=kg_ioput
 TEST_DIR=output
-ISCRIPDIR=../active/python3
+ISCRIPDIR=LINK_TO_REFACTOR_SCRIPTS
+LDLIBPATH=LINK_TO_LDLIBRARY
 
 export PYTHONPATH=$PYTHONPATH:$ISCRIPDIR
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/work/n02/n02/marc/python/software/unicicles-env_230620/lib::/work/n02/shared/robin/fcm_make_unicicles/jules_snow/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LDLIBPATH
 
 UMRES_ICE_ANCIL_IN=$KG_DIR/bisicles_db851c_19850101_orog-lo
 POSTICE_COUPLE_ICE_IN=$KG_DIR/bisicles_db851c_P1Y_19840101-19850101_icecouple
