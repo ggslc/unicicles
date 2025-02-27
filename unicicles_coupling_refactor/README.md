@@ -18,3 +18,7 @@ Quick tour of directories inside active/:
 - python3_legacy/ is the original code before refactoring.
 - python2_legacy/ is the python2 version of the original code (needed for Met Office HPC).
 - fortran/ and shell/ are not being touched for now.
+
+# data for unit tests
+Data files needed for unit tests are too large for GitHub (~33GB) and can be found here:
+https://gws-access.jasmin.ac.uk/public/ncas_climate/rssmith/unicicles/unit_testing/kg_ioput
