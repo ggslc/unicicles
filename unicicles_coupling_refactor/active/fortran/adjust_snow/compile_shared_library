@@ -1,0 +1,6 @@
+if [ -e libsnowpack_manipulations.so ]; then rm libsnowpack_manipulations.so ; fi
+
+#ifort -fPIC -shared -o libsnowpack_manipulations.so c_perma.F90 water_constants_mod_jls.F90 scale_snowpack.F90 add_snowpacks.F90 subtract_snowpacks.F90 adjust_stdalone.F90
+ftn -fPIC -shared -o libsnowpack_manipulations.so c_perma.F90 water_constants_mod_jls.F90 scale_snowpack.F90 add_snowpacks.F90 subtract_snowpacks.F90 adjust_stdalone.F90
+
+cp libsnowpack_manipulations.so ../

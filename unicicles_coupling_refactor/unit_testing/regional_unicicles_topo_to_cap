@@ -1,0 +1,16 @@
+KG_DIR=kg_ioput
+TEST_DIR=output
+ISCRIPDIR=LINK_TO_REFACTOR_SCRIPTS
+LDLIBPATH=LINK_TO_LDLIBRARY
+
+export PYTHONPATH=$PYTHONPATH:$ISCRIPDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LDLIBPATH
+
+POSTICE_ICE_PLOT=$KG_DIR/bisicles_db851c_19850101_plot
+ANCIL_GLOBE30=$KG_DIR/qrparm.orog_GLOBE30
+
+HIRES_ICE_ANCIL=$TEST_DIR/bisicles_db851c_19850101_orog-hi
+
+python $ISCRIPDIR/regional_unicicles_topo_to_cap.py --hdf5_input ${POSTICE_ICE_PLOT}-GrIS.hdf5 --um_input ${ANCIL_GLOBE30}-GrIS --um_output ${HIRES_ICE_ANCIL}-GrIS --region GrIS
+
+python $ISCRIPDIR/regional_unicicles_topo_to_cap.py --hdf5_input ${POSTICE_ICE_PLOT}-AIS.hdf5 --um_input ${ANCIL_GLOBE30}-AIS --um_output ${HIRES_ICE_ANCIL}-AIS --region AIS

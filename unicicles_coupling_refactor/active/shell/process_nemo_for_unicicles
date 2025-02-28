@@ -1,0 +1,58 @@
+#/bin/bash
+
+set -e
+
+ocean_output_pattern=$OCOUPLE_PATTERN
+
+#rebuilt isf-T files are available in $UNICICLES_DATAM. Careful only to take the right ones
+##don't rely on postproc to have winnowed
+
+#identify the working directories we need - assume cycles will be less frequent than daily for annual coupling!
+file_list=""
+cycle_dates=""
+
+echo "RESUB IS" ${RESUB} 
+RESUB=1
+echo "resetting to " ${RESUB} "this script is a mess, Marc has rewriten nicer for refactored suites"
+
+for ((i=0;i<365;i++)); do 
+
+  cycle_date_string=`rose date ${START_UNICICLES_DATE} --offset P$((i*RESUB))${CYCLE_PERIOD}`
+  cycle_date_stringYM=`rose date ${START_UNICICLES_DATE} --offset P$((i*RESUB))${CYCLE_PERIOD} --print-format=%Y%m`
+  cycle_date_sec=`rose date ${cycle_date_string} --print-format=%s` 
+  end_date_sec=`rose date ${END_UNICICLES_DATE} --print-format=%s`
+
+  echo $cycle_date_string  $cycle_date_stringYM $cycle_date_sec  $end_date_sec
+
+  if [ ${cycle_date_sec} -lt ${end_date_sec} ]; then
+    echo $cycle_date_stringYM is needed
+
+
+    cycle_date_file=${UNICICLES_DATAM}/?????o_*${ocean_output_pattern}*_${cycle_date_stringYM}*nc
+
+    echo $cycle_date_file
+    echo `ls $cycle_date_file`
+
+    if [ ! -s $cycle_date_file ]; then
+       echo "$cycle_date_file needed, does not exist"
+       #exit 2
+    fi
+    if [ -s $cycle_date_file ]; then
+       echo "$cycle_date_file needed, exists"
+    fi
+    
+    file_list="$file_list $cycle_date_file"
+
+  else
+    break
+  fi
+
+
+done
+
+#time-mean the files from each cycle, put the output in ${UNICICLES_DATAM}
+echo "averaging $file_list"
+echo "output to $POSTICE_OCOUPLE_NC"
+ncra -v sowflisf,sohfcisf $file_list $POSTICE_OCOUPLE_NC
+
+exit 0

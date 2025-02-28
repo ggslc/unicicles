@@ -1,0 +1,15 @@
+./ukesm_to_bike
+
+./regrid_eORCA_to_BIKE
+#./regrid_NEMO4.2_to_BIKE
+
+./bike_regrid_hdf5
+#./bike_regrid_hdf5-noUM
+
+./global_from_regional
+
+./rebin_BIKE_to_eORCA_anom
+#./ rebin_BIKE_to_eORCA_anom-ACTIVE
+
+./bike_to_ukesm
+#./bike_to_ukesm_RESETSNOW
