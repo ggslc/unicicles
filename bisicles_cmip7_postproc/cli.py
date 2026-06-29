@@ -175,6 +175,7 @@ def _build_diagnostics_parser():
 
 def run_diagnostics_cli(args=None):
     """Entry point for the ``bike-cmip7-postproc-diagnostics`` command."""
+    print("SLC diagnostics")
     # Pre-scan for --config before full parsing so we can set defaults
     import sys as _sys
     _raw = args if args is not None else _sys.argv[1:]
@@ -382,6 +383,7 @@ def _build_flatten_parser():
 
 def run_flatten_cli(args=None):
     """Entry point for the ``bike-cmip7-postproc-flatten`` command."""
+    print("SLC flatten")
     import sys as _sys
     _raw = args if args is not None else _sys.argv[1:]
     parser = _build_flatten_parser()
@@ -834,6 +836,7 @@ def run_ismip7_config_cli(args=None):
 # ---------------------------------------------------------------------------
 
 def main_diagnostics():
+    print ("main_diag")
     run_diagnostics_cli()
 
 
@@ -855,6 +858,7 @@ def main_ismip7_flatten():
 
 
 def main_ismip7_run():
+    print ("main_ismip7_run")
     run_ismip7_config_cli()
 
 

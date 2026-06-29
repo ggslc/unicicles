@@ -67,6 +67,10 @@ _RE_NEW_CFMEAN = re.compile(
     re.IGNORECASE,
 )
 
+_RE_MATT= re.compile(
+    r"plot-(?P<ice_sheet>[A-Z]+(?:[a-z]*[A-Z]*)*)\.hdf5$",
+    re.IGNORECASE,
+)
 
 # ---------------------------------------------------------------------------
 # Helper: convert YYYYMMDD integer to a fractional year
@@ -254,7 +258,7 @@ def parse_bisicles_filename(path) -> Optional[BISICLESFileInfo]:
             ice_sheet=m.group("ice_sheet").upper(),
             start_date=int(m.group("start_date")),
             end_date=int(m.group("end_date")),
-            is_time_mean=False,
+            is_time_mean=True,#False,
             period=m.group("period"),
         )
 
@@ -264,9 +268,9 @@ def parse_bisicles_filename(path) -> Optional[BISICLESFileInfo]:
         return BISICLESFileInfo(
             suite_id=m.group("suite_id"),
             ice_sheet=m.group("ice_sheet").upper(),
-            start_date=0,
+            start_date=int(m.group("date"))-1,
             end_date=int(m.group("date")),
-            is_time_mean=False,
+            is_time_mean=True,#False,
             period="",
         )
 

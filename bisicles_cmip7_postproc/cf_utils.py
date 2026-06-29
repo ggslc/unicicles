@@ -185,12 +185,22 @@ def _ismip7_drs_filename(varname, ice_sheet, source_id, ism_id, ism_member_id,
       ism_id           ISM name and version (e.g. "BISICLES")
       ism_member_id    ISM choice variant (e.g. "m001")
       esm_id           CMIP ESM used for forcing (e.g. "CESM2-WACCM" or "standalone")
-      forcing_member_id  Forcing choice variant (e.g. "f001")
+      forcing_member_id  Forcing choice variant (e.g. "f01801")
       experiment       Experiment identifier (e.g. "historical", "ssp585")
       set_counter      Set counter (e.g. "C001", "E001")
     """
-    start_yr = int(min(times_sorted))
-    end_yr   = int(max(times_sorted))
+    yr_offset = 0
+    #crude - need to offset times for ST variables
+    ST = ['lim','limnsw','iareagr','iareafl']
+    FL = ['tendacabf','tendlibmassbfgr','tendlibmassbffl',
+          'tendlicalvf','tendlifmassbf','tendligroundf']
+    if varname in ST:
+        yr_offset = 1
+    elif varname in FL:
+        yr_offset = 0
+        
+    start_yr = int(min(times_sorted)) - yr_offset
+    end_yr   = int(max(times_sorted)) - yr_offset
     mask_part = f"_mask{mask_no}" if mask_no else ""
     return (
         f"{varname}{mask_part}_{ice_sheet}_{source_id}_{ism_id}_"
@@ -280,7 +290,7 @@ def years_to_days(time_years, reference_year=1850, calendar="gregorian"):
         )
     days_per_year = _DAYS_PER_YEAR[calendar]
     days = (np.asarray(time_years, dtype=float) - reference_year) * days_per_year
-    units = f"days since {reference_year:04d}-01-01 00:00:00"
+    units = f"days since {reference_year:04d}-01-01"
     # Normalise "gregorian" to "standard" in the returned calendar string so that
     # the NetCDF attribute matches what ISMIP7 and CF compliance checkers expect.
     cf_calendar = "standard" if calendar == "gregorian" else calendar
@@ -429,7 +439,7 @@ def add_time_variable(ds, time_years, reference_year=1850, calendar="gregorian",
         days, units, calendar = years_to_days(time_years, reference_year, calendar)
     else:
         days = np.asarray(time_days, dtype=float)
-        units = f"days since {reference_year:04d}-01-01 00:00:00"
+        units = f"days since {reference_year:04d}-01-01"
         calendar = "standard" if calendar == "gregorian" else calendar
     time_var = ds.createVariable("time", dtype, ("time",))
     time_var[:] = days.astype(np.float32) if dtype == "f4" else days

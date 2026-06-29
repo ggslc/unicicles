@@ -5,7 +5,6 @@ for writing CF-compliant scalar timeseries NetCDF files.
 The diagnostics tool computes integrated quantities (total ice volume, area,
 mass balance fluxes, etc.) from a BISICLES plot HDF5 file and writes them as
 CSV rows.  This module:
-
   1. Locates and calls the diagnostics executable.
   2. Parses the CSV output into Python data structures.
   3. Assembles a time series from multiple plot files and writes a CF/CMIP7-
@@ -37,6 +36,7 @@ from .cf_utils import (
     get_global_attributes,
     period_to_cmip_frequency,
     add_time_variable,
+    add_crs_variable,
     add_time_bounds,
     _ismip7_drs_filename,
 )
@@ -277,7 +277,7 @@ def _build_timeseries(records, filename_to_info=None):
                 time_bounds[t] = None
         else:
             t = r["time"]
-            time_bounds[t] = None
+            time_bounds[t] =  (int(t)-0.5,int(t)+0.5)#(int(t),int(t)+1)
 
         times_set.add(t)
         var_key = (cname, mask_no)
@@ -399,7 +399,8 @@ def write_diagnostics_netcdf(
             "Check that the diagnostics tool produced output and that "
             "SCALAR_MAPPING covers the desired (region, quantity) pairs."
         )
-
+    
+    print (times, time_bounds)
     if not frequency and filename_to_info:
         first_info = next(iter(filename_to_info.values()))
         if first_info.period:
@@ -408,6 +409,9 @@ def write_diagnostics_netcdf(
     # In ISMIP7 mode, populate group/model from DRS fields when not set explicitly
     _group = group or source_id
     _model = ism_id
+
+    epsg_code = '3031' if ice_sheet == 'AIS' else 0
+    crs_str=f'epsg:{epsg_code}'
 
     global_attrs = get_global_attributes(
         institution=institution,
@@ -420,6 +424,7 @@ def write_diagnostics_netcdf(
         conventions="CF-1.12" if ismip7_mode else CF_CONVENTIONS,
         model_id=model_id,
         member_id=member_id,
+        crs=crs_str,
         group=_group if ismip7_mode else group,
         contact_name=contact_name,
         contact_email=contact_email,
@@ -474,6 +479,9 @@ def write_diagnostics_netcdf(
 
         with Dataset(str(out_path), "w", format="NETCDF4") as ds:
             ds.setncatts(global_attrs)
+            
+            add_crs_variable(ds, epsg_code, x0=None, y0=None)
+            
             ds.variable_id = cname
             ds.variable_name = cname
             ds.title = m["long_name"] if ismip7_mode else f"UniCiCles (BISICLES) output from UKESM: {m['long_name']}"
@@ -586,6 +594,7 @@ def process_single_file(
     plot_file = Path(plot_file)
     _check_not_cf_mean(plot_file)
     file_info = parse_bisicles_filename(plot_file)
+    
     filename_to_info = {plot_file.name: file_info} if file_info is not None else None
 
     # Override ice_sheet from filename when not set explicitly
@@ -673,14 +682,16 @@ def process_directory(
     """
     plot_files = find_plot_files(directory, pattern=plot_pattern)
     if verbose:
-        print(f"Found {len(plot_files)} plot files in {directory}")
+        print(f"S Found {len(plot_files)} plot files in {directory}")
 
     # Build filename -> BISICLESFileInfo mapping for UKESM-style filenames
     filename_to_info = {}
     for pf in plot_files:
         info = parse_bisicles_filename(pf)
+  
         if info is not None:
             filename_to_info[pf.name] = info
+            
     if not filename_to_info:
         filename_to_info = None  # Fall back to CSV time values
 
