@@ -277,7 +277,7 @@ def _build_timeseries(records, filename_to_info=None):
                 time_bounds[t] = None
         else:
             t = r["time"]
-            time_bounds[t] =  (int(t)-0.5,int(t)+0.5)#(int(t),int(t)+1)
+            time_bounds[t] =  (int(t)-(1),int(t))#(int(t),int(t)+1)
 
         times_set.add(t)
         var_key = (cname, mask_no)
@@ -410,7 +410,12 @@ def write_diagnostics_netcdf(
     _group = group or source_id
     _model = ism_id
 
-    epsg_code = '3031' if ice_sheet == 'AIS' else 0
+    epsg_code = '3031' 
+    if ice_sheet == 'AIS':
+        epsg_code = '3031'
+    elif ice_sheet == 'GrIS':
+        epsg_code = '3413'
+        
     crs_str=f'epsg:{epsg_code}'
 
     global_attrs = get_global_attributes(
