@@ -195,7 +195,7 @@ def _ismip7_drs_filename(varname, ice_sheet, source_id, ism_id, ism_member_id,
     FL = ['tendacabf','tendlibmassbfgr','tendlibmassbffl',
           'tendlicalvf','tendlifmassbf','tendligroundf']
     if varname in ST:
-        yr_offset = 1
+        yr_offset = 0
     elif varname in FL:
         yr_offset = 0
         

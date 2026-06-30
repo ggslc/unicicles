@@ -658,6 +658,7 @@ SCALAR_MAPPING = {
         "conversion_factor": ICE_DENSITY,   # m3 * kg m-3 = kg
         "cell_methods": "area: sum where ice_sheet time: mean",
         "cmip7_compliant": True,
+        "ismip7_type":"ST",
         "comment": "Total volume of land ice multiplied by ice density.",
     },
 
@@ -670,6 +671,7 @@ SCALAR_MAPPING = {
         "conversion_factor": ICE_DENSITY,
         "cell_methods": "area: sum where ice_sheet time: mean",
         "cmip7_compliant": True,
+        "ismip7_type":"ST",
         "comment": "Ice mass above flotation, relevant to sea-level change.",
     },
 
@@ -682,6 +684,7 @@ SCALAR_MAPPING = {
         "conversion_factor": 1.0,
         "cell_methods": "area: sum where grounded_ice_sheet (mask=sfgrlf) time: mean",
         "cmip7_compliant": True,
+        "ismip7_type":"ST",
     },
 
     # iareafl — floating_ice_shelf_area — CMIP7: iareafl_tavg-u-hm-fis
@@ -693,6 +696,7 @@ SCALAR_MAPPING = {
         "conversion_factor": 1.0,
         "cell_methods": "area: sum where floating_ice_shelf (mask=sftflf) time: mean",
         "cmip7_compliant": True,
+        "ismip7_type":"ST",
     },
 
     # tendacabf — CMIP7: tendacabf_tavg-u-hm-is
@@ -704,6 +708,7 @@ SCALAR_MAPPING = {
         "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
         "cell_methods": "area: sum where ice_sheet time: mean",
         "cmip7_compliant": True,
+        "ismip7_type":"FL",
     },
 
     # tendlibmassbf — CMIP7: tendlibmassbf_tavg-u-hm-is
@@ -715,8 +720,35 @@ SCALAR_MAPPING = {
         "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
         "cell_methods": "area: sum where ice_sheet time: mean",
         "cmip7_compliant": True,
+        "ismip7_type":"FL",
     },
+   
+    # tendlibmassbffl — CMIP7: tendlibmassbf_tavg-u-hm-is
+    ("floating", "BMB"): {
+        "cmip7_name": "tendlibmassbffl",
+        "standard_name": "tendency_of_land_ice_mass_due_to_basal_mass_balance",
+        "long_name": "Total Basal Mass Balance Flux",
+        "cmip7_units": "kg s-1",
+        "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
+        "cell_methods": "area: sum where ice_sheet time: mean",
+        "cmip7_compliant": True,
+        "ismip7_type":"FL",
+    },
+    
+    # tendlibmassbffl — CMIP7: tendlibmassbf_tavg-u-hm-is
+    ("grounded", "BMB"): {
+    "cmip7_name": "tendlibmassbfgr",
+    "standard_name": "tendency_of_land_ice_mass_due_to_basal_mass_balance",
+    "long_name": "Total Basal Mass Balance Flux",
+    "cmip7_units": "kg s-1",
+    "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
+    "cell_methods": "area: sum where ice_sheet time: mean",
+    "cmip7_compliant": True,
+    "ismip7_type":"FL",
+},
 
+    
+    
     # tendlicalvf — CMIP7: tendlicalvf_tavg-u-hm-is
     ("ice", "calving"): {
         "cmip7_name": "tendlicalvf",
@@ -727,6 +759,7 @@ SCALAR_MAPPING = {
         "cell_methods": "area: sum where ice_sheet time: mean",
         "cmip7_compliant": True,
         "comment": "Positive indicates mass loss by calving.",
+        "ismip7_type":"FL",
     },
 
     # ------------------------------------------------------------------
@@ -743,56 +776,10 @@ SCALAR_MAPPING = {
         "cmip7_units": "m^2",
         "conversion_factor": 1.0,
         "cell_methods": "area: sum where ice_sheet time: mean",
-        "cmip7_compliant": False,
+        "cmip7_compliant": False, "ismip7_type":"ST",
         "comment": (
             "Not a CMIP7 landIce out_name. "
             "Sum of ice-fraction-weighted cell areas over all ice-covered cells."
-        ),
-    },
-
-    # Ice discharge — no CMIP7 scalar equivalent.
-    ("ice", "discharge"): {
-        "cmip7_name": "discharge_total",
-        "standard_name": "tendency_of_land_ice_mass_due_to_ice_dynamics",
-        "long_name": "Total Ice Discharge",
-        "cmip7_units": "kg s-1",
-        "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
-        "cell_methods": "area: sum where ice_sheet time: mean",
-        "cmip7_compliant": False,
-        "comment": "Not a CMIP7 landIce out_name.",
-    },
-
-    # dh/dt integrated — no CMIP7 scalar equivalent.
-    ("ice", "dhdt"): {
-        "cmip7_name": "tendlim_dhdt",
-        "standard_name": "tendency_of_land_ice_mass",
-        "long_name": "Tendency of Total Land Ice Mass (from dh/dt)",
-        "cmip7_units": "kg s-1",
-        "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
-        "cell_methods": "area: sum where ice_sheet time: mean",
-        "cmip7_compliant": False,
-        "comment": (
-            "Not a CMIP7 landIce out_name. "
-            "Net rate of change of ice mass from the stored dh/dt field. "
-            "Should equal tendacabf + tendlibmassbf - tendlicalvf within "
-            "numerical precision."
-        ),
-    },
-
-    # Domain-wide SMB (includes non-ice cells) — no CMIP7 equivalent.
-    ("entire", "SMB"): {
-        "cmip7_name": "tendacabf_domain",
-        "standard_name": "tendency_of_land_ice_mass_due_to_surface_mass_balance",
-        "long_name": "Total Surface Mass Balance Flux (Entire Domain)",
-        "cmip7_units": "kg s-1",
-        "conversion_factor": ICE_DENSITY / SECS_PER_YEAR,
-        "cell_methods": "area: sum time: mean",
-        "cmip7_compliant": False,
-        "comment": (
-            "Not a CMIP7 landIce out_name. "
-            "SMB integrated over the entire model domain including ocean and "
-            "land cells. Differs from tendacabf which is restricted to "
-            "ice-covered cells."
         ),
     },
 }

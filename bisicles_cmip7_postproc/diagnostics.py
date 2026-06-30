@@ -278,13 +278,16 @@ def _build_timeseries(records, filename_to_info=None):
         else:
             t = r["time"]
             time_bounds[t] =  (int(t)-(1),int(t))#(int(t),int(t)+1)
-
+        
         times_set.add(t)
+        
         var_key = (cname, mask_no)
         if var_key not in data:
             data[var_key] = {}
             meta[cname] = m
         data[var_key][t] = r["value"] * m["conversion_factor"]
+
+    print("time_set", sorted(times_set))
 
     return sorted(times_set), data, meta, time_bounds
 
@@ -470,6 +473,8 @@ def write_diagnostics_netcdf(
         m = meta[cname]
 
         # File and variable name
+        print(m['ismip7_type'])
+        
         var_name = cname if mask_no == 0 else f"{cname}_mask{mask_no}"
         if ismip7_mode:
             out_path = output_dir / _ismip7_drs_filename(
@@ -493,7 +498,11 @@ def write_diagnostics_netcdf(
 
             # Time dimension (unlimited record dimension) and variable
             ds.createDimension("time", None)
-            add_time_variable(ds, time_arr, reference_year=reference_year,
+            
+            time_bodge = 0.5
+            if m['ismip7_type'] == 'ST':
+                time_bodge = 1.0
+            add_time_variable(ds, time_arr+time_bodge, reference_year=reference_year,
                               calendar=calendar, dtype=_time_dtype)
 
             # Time bounds for time-mean data
