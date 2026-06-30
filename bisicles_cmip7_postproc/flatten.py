@@ -294,8 +294,8 @@ def _read_flatten_nc(nc_path):
         if "time" in ds.variables:
             tv = ds.variables["time"]
             t_data = tv[:]
-            # flatten tool may write a 1-D array; take the first (or only) value
-            result["time"] = float(np.asarray(t_data).flat[0])
+            # flatten tool may write a 1-D array; take the last (or only) value
+            result["time"] = float(np.asarray(t_data).flat[-1])
             # Try to extract simulation time in years from units attribute
             if hasattr(tv, "units"):
                 result["time_units"] = tv.units
