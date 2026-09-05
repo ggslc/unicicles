@@ -253,11 +253,11 @@ def _regrid(flat_data, xygrid):
     for key, var in flat_data["variables"].items():
         rg = RegularGridInterpolator(
             (flat_data["y"], flat_data["x"]),
-            var,
+            var["arr"],
             bounds_error=False,
             fill_value=np.nan,
         )
-        result["variables"][key] = rg(xy).T
+        result["variables"][key] = {"arr":rg(xy).T, "time":var["time"]}
 
     return result
     
@@ -285,6 +285,9 @@ def _read_flatten_nc(nc_path):
 
     with Dataset(str(nc_path), "r") as ds:
         result["raw_attrs"] = {k: ds.getncattr(k) for k in ds.ncattrs()}
+        
+        dt = result['raw_attrs'].get('dt',0.0) 
+        #print(f'dt = {dt}')
 
         # Coordinate variables
         if "x" in ds.variables:
@@ -295,7 +298,12 @@ def _read_flatten_nc(nc_path):
             tv = ds.variables["time"]
             t_data = tv[:]
             # flatten tool may write a 1-D array; take the last (or only) value
-            result["time"] = float(np.asarray(t_data).flat[-1])
+            t_arr =  np.asarray(t_data).flat
+            result["time"] = float(t_arr[-1])
+            # start and end times might be determined from the 'time' array
+            result["time_start"] = result["time"] - dt
+            result["time_end"] = result["time"] 
+            #or from the 
             # Try to extract simulation time in years from units attribute
             if hasattr(tv, "units"):
                 result["time_units"] = tv.units
@@ -329,7 +337,12 @@ def _read_flatten_nc(nc_path):
                 arr = arr.data.astype(float)
                 if hasattr(v, "_FillValue"):
                     arr[arr == float(v._FillValue)] = np.nan
-            result["variables"][name] = arr
+                t = result['time']
+                if hasattr(v, "time_integration"):
+                    if (v.time_integration == 0):
+                        t -= 0.5 * dt
+            result["variables"][name] = {"arr":arr, "time": t}
+
 
     return result
 
