@@ -407,7 +407,7 @@ def get_crs_variable_attrs(epsg_code, x0=None, y0=None):
 
 
 def add_time_variable(ds, time_years, reference_year=1850, calendar="gregorian",
-                      dtype="f8", time_days=None):
+                      dtype="f8", time_days=None, name="time"):
     """
     Add a CF-compliant time variable to an open NetCDF4 Dataset.
 
@@ -437,17 +437,22 @@ def add_time_variable(ds, time_years, reference_year=1850, calendar="gregorian",
     """
     if time_days is None:
         days, units, calendar = years_to_days(time_years, reference_year, calendar)
+        
     else:
         days = np.asarray(time_days, dtype=float)
         units = f"days since {reference_year:04d}-01-01"
         calendar = "standard" if calendar == "gregorian" else calendar
-    time_var = ds.createVariable("time", dtype, ("time",))
+    time_var = ds.createVariable(name, dtype, (name,))
     time_var[:] = days.astype(np.float32) if dtype == "f4" else days
-    time_var.standard_name = "time"
-    time_var.long_name = "time"
+    time_var.standard_name = name
+    time_var.long_name = name
     time_var.units = units
     time_var.calendar = calendar
-    time_var.axis = "T"
+    time_var.axis = "TT"
+    
+    time_year_var = ds.createVariable("time_years", dtype, ("time",))
+    time_year_var[:] = time_years
+    
     return time_var
 
 
