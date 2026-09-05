@@ -3,7 +3,7 @@ Wrapper for the BISICLES flatten file tool and post-processing utilities for
 writing CMIP7/CF-compliant 2D spatial NetCDF files from BISICLES plot HDF5 files.
 
 Workflow
---------
+-------
 1. Call the flatten executable to collapse the multi-level AMR hierarchy onto a
    single uniform grid and write a preliminary NetCDF file.
 2. Open that NetCDF file in Python, apply unit conversions, rename variables to
@@ -245,20 +245,23 @@ def _regrid(flat_data, xygrid):
     result = {}
     result["x"], result["y"] = xygrid
     result["time"] = flat_data["time"]
+    result["time_start"] = flat_data["time_start"]
+    result["time_end"] = flat_data["time_end"]
     result["time_units"] = flat_data["time_units"]
     result["epsg"] = flat_data["epsg"]
     result["variables"] = {}
+    result["time_cell_methods"] = flat_data["time_cell_methods"].copy()
     xy = np.meshgrid(result["y"], result["x"])
 
     for key, var in flat_data["variables"].items():
         rg = RegularGridInterpolator(
             (flat_data["y"], flat_data["x"]),
-            var["arr"],
+            var,
             bounds_error=False,
             fill_value=np.nan,
         )
-        result["variables"][key] = {"arr":rg(xy).T, "time":var["time"]}
-
+        result["variables"][key] = rg(xy).T
+        
     return result
     
 
@@ -281,7 +284,7 @@ def _read_flatten_nc(nc_path):
     """
     from netCDF4 import Dataset
 
-    result = {"variables": {}, "x": None, "y": None, "time": None, "epsg": None}
+    result = {"variables": {}, "time_cell_methods": {}, "x": None, "y": None, "time": None, "epsg": None}
 
     with Dataset(str(nc_path), "r") as ds:
         result["raw_attrs"] = {k: ds.getncattr(k) for k in ds.ncattrs()}
@@ -298,11 +301,11 @@ def _read_flatten_nc(nc_path):
             tv = ds.variables["time"]
             t_data = tv[:]
             # flatten tool may write a 1-D array; take the last (or only) value
-            t_arr =  np.asarray(t_data).flat
-            result["time"] = float(t_arr[-1])
+            t =  np.asarray(t_data).flat[-1]
+            result["time"] = t 
             # start and end times might be determined from the 'time' array
-            result["time_start"] = result["time"] - dt
-            result["time_end"] = result["time"] 
+            result["time_start"] = t - dt
+            result["time_end"] = t - 1.0e-3
             #or from the 
             # Try to extract simulation time in years from units attribute
             if hasattr(tv, "units"):
@@ -337,12 +340,11 @@ def _read_flatten_nc(nc_path):
                 arr = arr.data.astype(float)
                 if hasattr(v, "_FillValue"):
                     arr[arr == float(v._FillValue)] = np.nan
-                t = result['time']
-                if hasattr(v, "time_integration"):
-                    if (v.time_integration == 0):
-                        t -= 0.5 * dt
-            result["variables"][name] = {"arr":arr, "time": t}
-
+            result["time_cell_methods"][name] = "time: point"
+            if hasattr(v, "time_integration"):
+                if (v.time_integration == 0): # time-means
+                        result["time_cell_methods"][name] = "time: mean"
+            result["variables"][name] = arr
 
     return result
 
@@ -639,17 +641,17 @@ def write_cmip7_per_variable_netcdfs(
     # Phase 1: accumulate time metadata and per-variable 2-D arrays
     # -----------------------------------------------------------------------
     times_list = []
-    is_time_mean_list = []
     time_start_list = []
     time_end_list = []
-    time_cell_method_list = []
-
+    
     # Accumulators: {name: [arr_at_t0, arr_at_t1, ...]}
     bisicles_arrays = {}
     cf_arrays = {}
     derived_arrays = {}
     derived_src = {}     # {derived_name: provenance_str} – from last timestep
     unmapped_arrays = {}
+    
+    time_cell_methods = {}
 
     x = None
     y = None
@@ -664,46 +666,27 @@ def write_cmip7_per_variable_netcdfs(
                 epsg = flatten_data.get("epsg")
 
         # Time metadata
+        
+
+            
         if file_info is not None:
             t = file_info.time_years
-            is_mean = file_info.is_time_mean
             t_start = file_info.start_time_years
             t_end = file_info.end_time_years
-            tcm = file_info.cell_methods_time
         else:
-            t_raw = flatten_data.get("time") or 0.0
-            is_cf_mean = flatten_data.get("_is_cf_mean", False)
-            is_mean = is_cf_mean
-            if is_cf_mean:
-                # Use time bounds from the flatten NC if the flatten tool wrote them,
-                # otherwise infer the averaging period from the time value:
-                #   N.5  → mid-year convention: averaging year N, period [N, N+1]
-                #   N.0  → end-of-period convention: averaging year N-1, period [N-1, N]
-                if "time_start" in flatten_data and "time_end" in flatten_data:
-                    t_start = flatten_data["time_start"]
-                    t_end   = flatten_data["time_end"]
-                else:
-                    frac = t_raw - int(t_raw)
-                    if abs(frac - 0.5) < 0.1:
-                        year = int(t_raw)           # midpoint: 2015.5 → year 2015
-                    else:
-                        year = int(round(t_raw)) - 1  # end-of-period: 2016.0 → year 2015
-                    t_start = float(year)
-                    t_end   = float(year + 1)
-                t = 0.5 * (t_start + t_end)
-                tcm = "time: mean"
+            t = flatten_data['time']
+            if "time_start" in flatten_data and "time_end" in flatten_data:
+                print('BBBB')
+                t_start = flatten_data["time_start"]
+                t_end   = flatten_data["time_end"]
             else:
-                t = t_raw
                 t_start = None
                 t_end = None
-                tcm = "time: point"
-
+            
         times_list.append(t)
-        is_time_mean_list.append(is_mean)
         time_start_list.append(t_start)
         time_end_list.append(t_end)
-        time_cell_method_list.append(tcm)
-
+        
         # Work on a mutable copy so _compute_derived_fields can add sftgrf/sftflf
         variables = dict(flatten_data.get("variables", {}))
         sources = _compute_derived_fields(
@@ -718,26 +701,29 @@ def write_cmip7_per_variable_netcdfs(
         for bname in FIELD_MAPPING:
             if bname in variables:
                 bisicles_arrays.setdefault(bname, []).append(variables[bname])
-
+                time_cell_methods[bname] = flatten_data["time_cell_methods"].get(bname,"point")
         # CF-output name -> CMIP7 (plot.CF-*.hdf5 files)
         written_cf = set()
         for cf_name in CF_FIELD_MAPPING:
             if cf_name in variables:
                 cf_arrays.setdefault(cf_name, []).append(variables[cf_name])
                 written_cf.add(cf_name)
+                time_cell_methods[cf_name] = flatten_data["time_cell_methods"].get(cf_name,"point")
 
         # Derived fields (sftgrf, sftflf) – skip if CF file already provides them
         for dname in DERIVED_FIELDS:
             if dname not in written_cf and dname in variables:
                 derived_arrays.setdefault(dname, []).append(variables[dname])
-
+                time_cell_methods[dname] = flatten_data["time_cell_methods"].get(dname,"point")
+                
         # Unmapped BISICLES variables
         if not cmip7_only:
             known = set(FIELD_MAPPING) | set(CF_FIELD_MAPPING) | set(DERIVED_FIELDS)
             for bname, arr in variables.items():
                 if bname not in known and arr.ndim >= 2:
                     unmapped_arrays.setdefault(bname, []).append(arr)
-
+                    time_cell_methods[bname] = flatten_data["time_cell_methods"].get(bname,"point")
+                    
     if x is None or y is None:
         raise ValueError("Flatten data is missing x or y coordinate arrays.")
 
@@ -746,57 +732,65 @@ def write_cmip7_per_variable_netcdfs(
     # -----------------------------------------------------------------------
     sort_idx = sorted(range(len(times_list)), key=lambda i: times_list[i])
     times_sorted = [times_list[i] for i in sort_idx]
-    is_mean_sorted = [is_time_mean_list[i] for i in sort_idx]
     t_start_sorted = [time_start_list[i] for i in sort_idx]
     t_end_sorted = [time_end_list[i] for i in sort_idx]
-    tcm_sorted = [time_cell_method_list[i] for i in sort_idx]
+    
+    print(t_start_sorted)
+    print(t_end_sorted)
+    #tcm_sorted = [time_cell_method_list[i] for i in sort_idx]
 
     # Use the cell_method from the first timestep for the whole file.
     # Within a single run all files are consistently either time-mean or snapshot.
-    time_cell_method = tcm_sorted[0] if tcm_sorted else "time: point"
-    has_time_bounds = any(is_mean_sorted)
+    #time_cell_method = tcm_sorted[0] if tcm_sorted else "time: point"
+    
+
+    has_time_bounds = True
     time_arr = np.asarray(times_sorted)
 
     # -----------------------------------------------------------------------
     # Compute ISMIP7-correct time coordinates using exact calendar arithmetic:
-    #   Annual means  → timestamp = YYYY-07-01, bounds = [YYYY-01-01, (YYYY+1)-01-01]
-    #   Snapshots     → timestamp = YYYY-01-01 (integer year rounded)
+    #   Annual means  → timestamp = YYYY-07-01, bounds = [YYYY-01-01, (YYYY)-12-31]
+    #   Snapshots     → timestamp = YYYY-12-31 (integer year rounded)
     # This avoids the ±1-3 day error in the 365.25-days/year approximation.
     # -----------------------------------------------------------------------
     _cal_key = "standard" if calendar == "gregorian" else calendar
 
-    def _to_exact_days(t, is_mean, t_start, t_end):
+    def _to_exact_days(t, t_start, t_end):
         """Return (time_days, bound_start_days, bound_end_days) for one timestep."""
-        if is_mean and t_start is not None and t_end is not None:
+        # Snapshot or non-annual mean → round to nearest integer year, use Dec-31
+        yr = int(round(t))
+        d = exact_days_since(yr, 1, 1, reference_year, _cal_key) - 1
+        
+        if t_start is not None and t_end is not None:
             s = round(t_start)
             e = round(t_end)
             if abs(t_start - s) < 0.01 and abs(t_end - e) < 0.01 and e - s == 1:
                 # Annual mean with integer Jan-1 boundaries → exact July-1 timestamp
                 return (
+                    d,
                     exact_days_since(int(s), 7, 1, reference_year, _cal_key),
                     exact_days_since(int(s), 1, 1, reference_year, _cal_key),
-                    exact_days_since(int(e), 1, 1, reference_year, _cal_key),
+                    exact_days_since(int(e), 1, 1, reference_year, _cal_key) - 1,
                 )
-        # Snapshot or non-annual mean → round to nearest integer year, use Jan-1
-        yr = int(round(t))
-        d = exact_days_since(yr, 1, 1, reference_year, _cal_key)
-        return d, d, d  # bounds ignored for snapshots
+
+        return d, d, d, d  # bounds ignored for snapshots
 
     _exact_t  = []
+    _exact_tmid = []
     _exact_bs = []
     _exact_be = []
     for _i in range(len(times_sorted)):
-        _td, _bs, _be = _to_exact_days(
-            times_sorted[_i], is_mean_sorted[_i],
-            t_start_sorted[_i], t_end_sorted[_i],
+        _td, _tm, _bs, _be = _to_exact_days(
+            times_sorted[_i], t_start_sorted[_i], t_end_sorted[_i],
         )
         _exact_t.append(_td)
+        _exact_tmid.append(_tm)
         _exact_bs.append(_bs)
         _exact_be.append(_be)
     _exact_t  = np.array(_exact_t)
     _exact_bs = np.array(_exact_bs) if has_time_bounds else None
     _exact_be = np.array(_exact_be) if has_time_bounds else None
-
+    _exact_tmid = np.array(_exact_tmid) if has_time_bounds else None
     def _sort(arr_list):
         """Return arr_list reordered by sort_idx."""
         return [arr_list[i] for i in sort_idx]
@@ -899,17 +893,17 @@ def write_cmip7_per_variable_netcdfs(
     # Pre-build time-bounds lists once (used inside _setup_ds)
     if has_time_bounds:
         _tb_start = [
-            t_start_sorted[i] if is_mean_sorted[i] else times_sorted[i]
+            t_start_sorted[i] if t_start_sorted[i] is not None else times_sorted[i]
             for i in range(len(times_sorted))
         ]
         _tb_end = [
-            t_end_sorted[i] if is_mean_sorted[i] else times_sorted[i]
+            t_end_sorted[i] if t_end_sorted[i] is not None  else times_sorted[i]
             for i in range(len(times_sorted))
         ]
     else:
         _tb_start = _tb_end = None
 
-    def _setup_ds(ds):
+    def _setup_ds(ds, time_cell_method):
         """Populate dimensions, coordinates, and global attributes."""
         ds.setncatts(global_attrs)
         ds.createDimension("time", None)  # unlimited record dimension
@@ -918,7 +912,7 @@ def write_cmip7_per_variable_netcdfs(
         add_xy_variables(ds, x, y, epsg_code=epsg)
         add_time_variable(ds, time_arr, reference_year=reference_year,
                           calendar=calendar, dtype=_time_dtype,
-                          time_days=_exact_t)
+                          time_days=_exact_t if time_cell_method == "time: point" else _exact_tmid)
         if has_time_bounds:
             add_time_bounds(ds, _tb_start, _tb_end,
                             reference_year=reference_year, calendar=calendar,
@@ -942,7 +936,8 @@ def write_cmip7_per_variable_netcdfs(
             fname = _ismip7_drs_filename(
                 varname, ice_sheet, source_id, ism_id, ism_member_id,
                 esm_id, forcing_member_id, experiment, set_counter,
-                times_sorted, mask_no=mask_no,
+                np.array(times_sorted) - 1, # bike files span (t-1, t]
+                mask_no=mask_no,
             )
         else:
             fname = f"{varname}.nc"
@@ -962,11 +957,11 @@ def write_cmip7_per_variable_netcdfs(
         out_name = mapping["cmip7_name"]
         out_path = _out_path(out_name)
         with Dataset(str(out_path), "w", format="NETCDF4") as ds:
-            _setup_ds(ds)
+            _setup_ds(ds,time_cell_methods[bisicles_name])
             ds.variable_id = out_name
             ds.variable_name = out_name
             ds.title = _title(mapping["long_name"])
-            _write_2d_var(ds, out_name, arr_stack, mapping, time_cell_method,
+            _write_2d_var(ds, out_name, arr_stack, mapping, time_cell_methods[bisicles_name],
                           grid_mapping, bisicles_name=bisicles_name,
                           coordinates=coords_str, fill_value=_fill_value)
         output_files.append(out_path)
@@ -979,11 +974,11 @@ def write_cmip7_per_variable_netcdfs(
         out_name = mapping["cmip7_name"]
         out_path = _out_path(out_name)
         with Dataset(str(out_path), "w", format="NETCDF4") as ds:
-            _setup_ds(ds)
+            _setup_ds(ds,time_cell_methods[cf_name])
             ds.variable_id = out_name
             ds.variable_name = out_name
             ds.title = _title(mapping["long_name"])
-            _write_2d_var(ds, out_name, arr_stack, mapping, time_cell_method,
+            _write_2d_var(ds, out_name, arr_stack, mapping, time_cell_methods[cf_name],
                           grid_mapping, coordinates=coords_str,
                           fill_value=_fill_value)
         output_files.append(out_path)
