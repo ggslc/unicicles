@@ -60,6 +60,7 @@ import numpy as np
 from .cmip7_vars import (
     FIELD_MAPPING,
     CF_FIELD_MAPPING,
+    CF_SCALAR_MAPPING,
     DERIVED_FIELDS,
     GRID_GEOMETRY_FIELDS,
     GROUNDED_MASK_VAL,
@@ -254,13 +255,16 @@ def _regrid(flat_data, xygrid):
     xy = np.meshgrid(result["y"], result["x"])
 
     for key, var in flat_data["variables"].items():
-        rg = RegularGridInterpolator(
-            (flat_data["y"], flat_data["x"]),
-            var,
-            bounds_error=False,
-            fill_value=np.nan,
-        )
-        result["variables"][key] = rg(xy).T
+        
+        if var.ndim == 2:
+            rg = RegularGridInterpolator(
+                (flat_data["y"], flat_data["x"]),
+                var,
+                bounds_error=False,
+                fill_value=np.nan)
+            result["variables"][key] = rg(xy).T
+        else:
+            result["variables"][key] = flat_data["variables"][key].copy()
         
     return result
     
@@ -284,7 +288,7 @@ def _read_flatten_nc(nc_path):
     """
     from netCDF4 import Dataset
 
-    result = {"variables": {}, "time_cell_methods": {}, "x": None, "y": None, "time": None, "epsg": None}
+    result = {"variables": {}, "time_cell_methods": {}, "scalars": {}, "x": None, "y": None, "time": None, "epsg": None}
 
     with Dataset(str(nc_path), "r") as ds:
         result["raw_attrs"] = {k: ds.getncattr(k) for k in ds.ncattrs()}
@@ -333,18 +337,23 @@ def _read_flatten_nc(nc_path):
             if name in skip:
                 continue
             v = ds.variables[name]
-            if v.ndim < 2:
-                continue
-            arr = v[:]
-            if hasattr(arr, "data"):
-                arr = arr.data.astype(float)
-                if hasattr(v, "_FillValue"):
-                    arr[arr == float(v._FillValue)] = np.nan
-            result["time_cell_methods"][name] = "time: point"
-            if hasattr(v, "time_integration"):
-                if (v.time_integration == 0): # time-means
-                        result["time_cell_methods"][name] = "time: mean"
-            result["variables"][name] = arr
+            if v.ndim > 0 and v.ndim < 3:
+                arr = v[:]
+                if hasattr(arr, "data"):
+                    arr = arr.data.astype(float)
+                    if hasattr(v, "_FillValue"):
+                        arr[arr == float(v._FillValue)] = np.nan
+                result["time_cell_methods"][name] = "time: point"
+                if hasattr(v, "time_integration"):
+                    if (v.time_integration == 0): # time-means
+                            result["time_cell_methods"][name] = "time: mean"
+                elif v.ndim == 1:
+                    #Some bodges ....
+                    # bisicles CF output missing time integration data for scalars
+                    if len(name) > 5 and name[:4] == 'tend': # as it happens...
+                        result["time_cell_methods"][name] = "time: mean" 
+                    
+                result["variables"][name] = arr
 
     return result
 
@@ -447,10 +456,10 @@ def _compute_derived_fields(
 # Module-level variable-writing helper
 # ---------------------------------------------------------------------------
 
-def _write_2d_var(ds, out_name, arr_3d, mapping, time_cell_method, grid_mapping,
+def _write_Nd_var(ds, out_name, arr_3d, mapping, time_cell_method, grid_mapping,
                   bisicles_name=None, coordinates="", fill_value=FILL_VALUE):
     """
-    Write one ``(time, y, x)`` data variable with full CF/CMIP7 metadata.
+    Write one ``(time, y, x)`` or ``(time, )`` data variable with full CF/CMIP7 metadata.
 
     Parameters
     ----------
@@ -488,23 +497,28 @@ def _write_2d_var(ds, out_name, arr_3d, mapping, time_cell_method, grid_mapping,
     cell_methods = mapping["cell_methods"]
     if time_cell_method == "time: point":
         cell_methods = cell_methods.replace("time: mean", "time: point")
-    var = ds.createVariable(out_name, "f4", ("time", "y", "x"), fill_value=fill_value)
+    if arr.ndim == 3:
+        var = ds.createVariable(out_name, "f4", ("time", "y", "x"), fill_value=fill_value)
+    elif arr.ndim == 1:
+        var = ds.createVariable(out_name, "f4", ("time"), fill_value=fill_value)
+        
     var[:] = arr
     var.standard_name = mapping["standard_name"]
     var.long_name = mapping["long_name"]
     var.units = mapping["cmip7_units"]
     var.missing_value = np.float32(fill_value)
     var.cell_methods = cell_methods
-    var.modeling_realm = mapping["modeling_realm"]
-    if coordinates:
-        var.coordinates = coordinates
-    if grid_mapping:
-        var.grid_mapping = grid_mapping
+    if arr.ndim == 3:
+        var.modeling_realm = mapping["modeling_realm"]
+        if coordinates:
+            var.coordinates = coordinates
+        if grid_mapping:
+            var.grid_mapping = grid_mapping
     if "comment" in mapping:
         var.comment = mapping["comment"]
     if bisicles_name is not None:
         var.bisicles_name = bisicles_name
-    var.bisicles_units = mapping["bisicles_units"]
+    var.bisicles_units = mapping.get("bisicles_units","")
 
 
 # ---------------------------------------------------------------------------
@@ -647,6 +661,7 @@ def write_cmip7_per_variable_netcdfs(
     # Accumulators: {name: [arr_at_t0, arr_at_t1, ...]}
     bisicles_arrays = {}
     cf_arrays = {}
+    cf_scalars = {}
     derived_arrays = {}
     derived_src = {}     # {derived_name: provenance_str} – from last timestep
     unmapped_arrays = {}
@@ -676,7 +691,6 @@ def write_cmip7_per_variable_netcdfs(
         else:
             t = flatten_data['time']
             if "time_start" in flatten_data and "time_end" in flatten_data:
-                print('BBBB')
                 t_start = flatten_data["time_start"]
                 t_end   = flatten_data["time_end"]
             else:
@@ -709,7 +723,14 @@ def write_cmip7_per_variable_netcdfs(
                 cf_arrays.setdefault(cf_name, []).append(variables[cf_name])
                 written_cf.add(cf_name)
                 time_cell_methods[cf_name] = flatten_data["time_cell_methods"].get(cf_name,"point")
-
+        
+        written_cf_scalars = set() 
+        for cf_name, mapping in CF_SCALAR_MAPPING.items():
+            if cf_name in variables:
+                cf_scalars.setdefault(cf_name, []).append(variables[cf_name])
+                written_cf_scalars.add(cf_name)
+                time_cell_methods[cf_name] = flatten_data["time_cell_methods"].get(cf_name,"point")
+                
         # Derived fields (sftgrf, sftflf) – skip if CF file already provides them
         for dname in DERIVED_FIELDS:
             if dname not in written_cf and dname in variables:
@@ -734,16 +755,6 @@ def write_cmip7_per_variable_netcdfs(
     times_sorted = [times_list[i] for i in sort_idx]
     t_start_sorted = [time_start_list[i] for i in sort_idx]
     t_end_sorted = [time_end_list[i] for i in sort_idx]
-    
-    print(t_start_sorted)
-    print(t_end_sorted)
-    #tcm_sorted = [time_cell_method_list[i] for i in sort_idx]
-
-    # Use the cell_method from the first timestep for the whole file.
-    # Within a single run all files are consistently either time-mean or snapshot.
-    #time_cell_method = tcm_sorted[0] if tcm_sorted else "time: point"
-    
-
     has_time_bounds = True
     time_arr = np.asarray(times_sorted)
 
@@ -903,13 +914,19 @@ def write_cmip7_per_variable_netcdfs(
     else:
         _tb_start = _tb_end = None
 
-    def _setup_ds(ds, time_cell_method):
+    def _setup_ds(ds, time_cell_method, ndim=2):
         """Populate dimensions, coordinates, and global attributes."""
         ds.setncatts(global_attrs)
         ds.createDimension("time", None)  # unlimited record dimension
-        ds.createDimension("y", ny)
-        ds.createDimension("x", nx_size)
-        add_xy_variables(ds, x, y, epsg_code=epsg)
+        if ndim == 2:
+            ds.createDimension("y", ny)
+            ds.createDimension("x", nx_size)
+            add_xy_variables(ds, x, y, epsg_code=epsg)
+            if epsg is not None:
+                add_crs_variable(ds, epsg, x0=x0, y0=y0)
+            if has_latlon:
+                add_latlon_variables(ds, lat_2d, lon_2d)
+            
         add_time_variable(ds, time_arr, reference_year=reference_year,
                           calendar=calendar, dtype=_time_dtype,
                           time_days=_exact_t if time_cell_method == "time: point" else _exact_tmid)
@@ -919,10 +936,7 @@ def write_cmip7_per_variable_netcdfs(
                             dtype=_time_dtype,
                             start_days=_exact_bs,
                             end_days=_exact_be)
-        if epsg is not None:
-            add_crs_variable(ds, epsg, x0=x0, y0=y0)
-        if has_latlon:
-            add_latlon_variables(ds, lat_2d, lon_2d)
+
 
     def _title(long_name):
         """Return the NetCDF title attribute for a variable."""
@@ -978,11 +992,28 @@ def write_cmip7_per_variable_netcdfs(
             ds.variable_id = out_name
             ds.variable_name = out_name
             ds.title = _title(mapping["long_name"])
-            _write_2d_var(ds, out_name, arr_stack, mapping, time_cell_methods[cf_name],
+            _write_Nd_var(ds, out_name, arr_stack, mapping, time_cell_methods[cf_name],
                           grid_mapping, coordinates=coords_str,
                           fill_value=_fill_value)
         output_files.append(out_path)
-
+        
+    # 2.5 scalrs in CF files
+    for cf_name, mapping in CF_SCALAR_MAPPING.items():
+       
+        if cf_name is not None and cf_name in cf_scalars:
+            arr = np.stack(_sort(cf_scalars[cf_name]), axis=0).flatten()
+            out_name = cf_name
+            out_path = _out_path(out_name)
+            with Dataset(str(out_path), "w", format="NETCDF4") as ds:
+                _setup_ds(ds,time_cell_methods[cf_name],ndim=0)
+                ds.variable_id = out_name
+                ds.variable_name = out_name
+                ds.title = _title(mapping["long_name"])
+                _write_Nd_var(ds, out_name, arr, mapping, time_cell_methods[cf_name],
+                          grid_mapping, coordinates=coords_str,
+                          fill_value=_fill_value)
+            output_files.append(out_path)
+            
     # 3. Derived fields (sftgrf, sftflf) – skip if CF file already provided them
     for derived_name, dmeta in DERIVED_FIELDS.items():
         if derived_name in cf_arrays:
