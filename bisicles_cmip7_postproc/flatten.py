@@ -770,7 +770,7 @@ def write_cmip7_per_variable_netcdfs(
         """Return (time_days, bound_start_days, bound_end_days) for one timestep."""
         # Snapshot or non-annual mean → round to nearest integer year, use Dec-31
         yr = int(round(t))
-        d = exact_days_since(yr, 1, 1, reference_year, _cal_key) - 1
+        d = exact_days_since(yr, 1, 1, reference_year, _cal_key) 
         
         if t_start is not None and t_end is not None:
             s = round(t_start)
@@ -781,7 +781,7 @@ def write_cmip7_per_variable_netcdfs(
                     d,
                     exact_days_since(int(s), 7, 1, reference_year, _cal_key),
                     exact_days_since(int(s), 1, 1, reference_year, _cal_key),
-                    exact_days_since(int(e), 1, 1, reference_year, _cal_key) - 1,
+                    exact_days_since(int(e), 1, 1, reference_year, _cal_key) ,
                 )
 
         return d, d, d, d  # bounds ignored for snapshots
@@ -816,7 +816,7 @@ def write_cmip7_per_variable_netcdfs(
     # Attempt to compute 2-D lat/lon auxiliary coordinates (requires pyproj).
     # lat/lon are required by CF-1.12 / CMOR for projected-coordinate grids.
     lat_2d = lon_2d = None
-    if epsg is not None and epsg != 4326:
+    if not ismip7_mode and epsg is not None and epsg != 4326:
         try:
             lat_2d, lon_2d = compute_latlon_arrays(x, y, epsg)
         except ImportError as _exc:
