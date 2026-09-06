@@ -760,8 +760,8 @@ def write_cmip7_per_variable_netcdfs(
 
     # -----------------------------------------------------------------------
     # Compute ISMIP7-correct time coordinates using exact calendar arithmetic:
-    #   Annual means  → timestamp = YYYY-07-01, bounds = [YYYY-01-01, (YYYY)-12-31]
-    #   Snapshots     → timestamp = YYYY-12-31 (integer year rounded)
+    #   Annual means  → timestamp = YYYY-07-01, bounds = [YYYY-01-01, (YYYY+1)-01-01]
+    #   Snapshots     → timestamp = (YYYY+1)-01-01 (integer year rounded)
     # This avoids the ±1-3 day error in the 365.25-days/year approximation.
     # -----------------------------------------------------------------------
     _cal_key = "standard" if calendar == "gregorian" else calendar
