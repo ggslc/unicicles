@@ -450,8 +450,8 @@ def add_time_variable(ds, time_years, reference_year=1850, calendar="gregorian",
     time_var.calendar = calendar
     time_var.axis = "TT"
     
-    time_year_var = ds.createVariable("time_years", dtype, ("time",))
-    time_year_var[:] = time_years
+    #time_year_var = ds.createVariable("time_years", dtype, ("time",))
+    #time_year_var[:] = time_years
     
     return time_var
 

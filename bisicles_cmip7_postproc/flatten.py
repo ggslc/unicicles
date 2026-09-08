@@ -230,7 +230,67 @@ def compute_flotation_mask(
     mask = np.where(is_grounded, GROUNDED_MASK_VAL, mask)
     return mask
 
+def _apply_rules(flat_data):
+    """
+    All about pleasing IMSIP.
+    
+    Apply a bunch of misc rules to the flat_data fields and scalars.
+    
+    also add some non-bisciels fields that IMSIP7 requests...
+    
+    and keep a log of where cells have been altered
+    
+    """
+    
+    fields = flat_data["variables"]
+    
+    if "base" in fields.keys() and "topg" in fields.keys() and "orog" in fields.keys() and "lithk" in fields.keys():
+        
+        #should not happen, but crops up due to interpolation in CF outout
+        err = fields["base"] <  fields["topg"]
+        fields["base"] = np.where(err, fields["topg"], fields["base"])
+        
+        #set base = topg in all grounded cells
+        fields["modified"] = np.where(err, 1.0, 0.0)
+        if "sftgrf" in fields.keys():
+            ZZZ = 1.0-1.0e-10
+            err = np.logical_and(fields["sftgrf"] > ZZZ,fields["topg"] < fields["base"])
+            fields["base"] = np.where(err, fields["topg"], fields["base"])
+            #fields['sftgrf'][err] = ZZZ
+            fields["modified"][err] += 2
+        
+        fields["orog"] = fields["base"] +  fields["lithk"]
+        
+        err = fields["orog"] < 0.0
+        fields["orog"] = np.where(err, 0.0, fields["orog"])
+        fields["lithk"] = np.where(err, 0.0, fields["lithk"])
+        fields["base"] = np.where(err, 0.0, fields["base"])
+        fields["modified"][err] += 4
+        
 
+
+    if "licalvf" in fields.keys():  
+        fields["lifmassbf"] = 0.0 * fields["licalvf"]
+        
+    if "tendlicalvf" in fields.keys():  
+        #print("FFFFFFFFFFFFFFFFFFFFFFFFFF")
+        fields["tendlifmassbf"] = 0.0 * fields["tendlicalvf"]
+        
+    if "sftgif" in fields.keys() and "sftgrf" in fields.keys() and "sftflf" in fields.keys():
+        fields["sftgif"] = fields["sftgrf"] +  fields["sftflf"]
+        
+    def setnan(field, frac):
+        if field in fields.keys() and frac in fields.keys():
+            fields[field][fields[frac] <  1.0e-10] = np.nan
+
+    setnan("libmassbfgr","sftgrf")
+    setnan("libmassbffl","sftflf")
+    setnan("xvelmean","sftgif")
+    setnan("yvelmean","sftgif")
+    setnan("strbasemag","sftgif")
+       
+    return flat_data
+    
 
 def _regrid(flat_data, xygrid):
     """
@@ -719,7 +779,9 @@ def write_cmip7_per_variable_netcdfs(
         # CF-output name -> CMIP7 (plot.CF-*.hdf5 files)
         written_cf = set()
         for cf_name in CF_FIELD_MAPPING:
+           # print(cf_name)
             if cf_name in variables:
+                #print(cf_name)
                 cf_arrays.setdefault(cf_name, []).append(variables[cf_name])
                 written_cf.add(cf_name)
                 time_cell_methods[cf_name] = flatten_data["time_cell_methods"].get(cf_name,"point")
@@ -1078,38 +1140,40 @@ def write_cmip7_per_variable_netcdfs(
             output_files.append(out_path)
 
     # 5. Grid-geometry fields (modelcellareai) — computed from x/y, no time dim
-    dx = abs(float(x[1] - x[0])) if nx_size > 1 else 1.0
-    dy = abs(float(y[1] - y[0])) if ny > 1 else 1.0
-    cell_area = np.full((ny, nx_size), dx * dy, dtype=np.float64)
-
-    for geom_name, gmeta in GRID_GEOMETRY_FIELDS.items():
-        out_path = output_dir / f"{geom_name}.nc"
-        with Dataset(str(out_path), "w", format="NETCDF4") as ds:
-            ds.setncatts(global_attrs)
-            ds.variable_id = geom_name
-            ds.variable_name = geom_name
-            ds.title = _title(gmeta["long_name"])
-            ds.createDimension("y", ny)
-            ds.createDimension("x", nx_size)
-            add_xy_variables(ds, x, y, epsg_code=epsg)
-            if epsg is not None:
-                add_crs_variable(ds, epsg, x0=x0, y0=y0)
-            if has_latlon:
-                add_latlon_variables(ds, lat_2d, lon_2d)
-            var = ds.createVariable(geom_name, _geom_dtype, ("y", "x"))
-            var[:] = cell_area
-            var.standard_name = gmeta["standard_name"]
-            var.long_name = gmeta["long_name"]
-            var.units = gmeta["cmip7_units"]
-            var.cell_methods = gmeta["cell_methods"]
-            var.modeling_realm = gmeta["modeling_realm"]
-            if coords_str:
-                var.coordinates = coords_str
-            if grid_mapping:
-                var.grid_mapping = grid_mapping
-        output_files.append(out_path)
+    if not ismip7_mode: 
+        dx = abs(float(x[1] - x[0])) if nx_size > 1 else 1.0
+        dy = abs(float(y[1] - y[0])) if ny > 1 else 1.0
+        cell_area = np.full((ny, nx_size), dx * dy, dtype=np.float64)
+    
+        for geom_name, gmeta in GRID_GEOMETRY_FIELDS.items():
+            out_path = output_dir / f"{geom_name}.nc"
+            with Dataset(str(out_path), "w", format="NETCDF4") as ds:
+                ds.setncatts(global_attrs)
+                ds.variable_id = geom_name
+                ds.variable_name = geom_name
+                ds.title = _title(gmeta["long_name"])
+                ds.createDimension("y", ny)
+                ds.createDimension("x", nx_size)
+                add_xy_variables(ds, x, y, epsg_code=epsg)
+                if epsg is not None:
+                    add_crs_variable(ds, epsg, x0=x0, y0=y0)
+                if has_latlon:
+                    add_latlon_variables(ds, lat_2d, lon_2d)
+                var = ds.createVariable(geom_name, _geom_dtype, ("y", "x"))
+                var[:] = cell_area
+                var.standard_name = gmeta["standard_name"]
+                var.long_name = gmeta["long_name"]
+                var.units = gmeta["cmip7_units"]
+                var.cell_methods = gmeta["cell_methods"]
+                var.modeling_realm = gmeta["modeling_realm"]
+                if coords_str:
+                    var.coordinates = coords_str
+                if grid_mapping:
+                    var.grid_mapping = grid_mapping
+            output_files.append(out_path)
 
     return output_files
+
 
 
 # ---------------------------------------------------------------------------
@@ -1184,6 +1248,8 @@ def _flatten_plot_file(
         flatten_data = _read_flatten_nc(tmp_nc)
         if xygrid is not None:
             flatten_data = _regrid(flatten_data, xygrid)
+        flatten_data = _apply_rules(flatten_data)  
+            
     finally:
         if _tmp_path is not None and _tmp_path.exists():
             os.unlink(_tmp_path)

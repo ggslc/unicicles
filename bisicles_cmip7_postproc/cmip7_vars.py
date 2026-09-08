@@ -311,6 +311,19 @@ CF_FIELD_MAPPING = {
         "modeling_realm": "landIce",
         "cmip7_compliant": True,
     },
+    
+    "base": {
+    "cmip7_name": "base",
+    "standard_name": "ice_lower_surface_altitude",
+    "long_name": "Ice Lower Surface Altitude",
+    "cmip7_units": "m",
+    "bisicles_units": "m",
+    "conversion_factor": 1.0,
+    "cell_methods": "area: time: mean where ice_sheet",
+    "modeling_realm": "landIce",
+    "cmip7_compliant": False, 
+    },
+    
     "topg": {
         "cmip7_name": "topg",
         "standard_name": "bedrock_altitude",
@@ -366,6 +379,30 @@ CF_FIELD_MAPPING = {
         "modeling_realm": "landIce",
         "cmip7_compliant": True,
     },
+    "xvelmean": {
+    "cmip7_name": "xvelmean",
+    "standard_name": "land_ice_vertical_mean_x_velocity",
+    "long_name": "X-Component of Land Ice Vertical Mean Velocity",
+    "cmip7_units": "m s-1",
+    "bisicles_units": "m yr-1",
+    "conversion_factor": _M_A_TO_M_S,
+    "cell_methods": "area: time: mean where ice_sheet",
+    "modeling_realm": "landIce",
+    "cmip7_compliant": True,
+},
+    "yvelmean": {
+        "cmip7_name": "yvelmean",
+        "standard_name": "land_ice_vertical_mean_y_velocity",
+        "long_name": "Y-Component of Land Ice Vertical Mean Velocity",
+        "cmip7_units": "m s-1",
+        "bisicles_units": "m yr-1",
+        "conversion_factor": _M_A_TO_M_S,
+        "cell_methods": "area: time: mean where ice_sheet",
+        "modeling_realm": "landIce",
+        "cmip7_compliant": True,
+    },
+    
+    
     "litemptop": {
         "cmip7_name": "litemptop",
         "standard_name": "temperature_at_top_of_ice_sheet_model",
@@ -390,33 +427,34 @@ CF_FIELD_MAPPING = {
     },
     # CMIP7 requires sftgrf and sftflf in % (0–100); BISICLES CF output writes
     # them as dimensionless fractions (0–1), so conversion_factor = 100.
+    # BUT ISMIP 7 wnats 0-1....
     "sftgrf": {
         "cmip7_name": "sftgrf",
         "standard_name": "grounded_ice_sheet_area_fraction",
-        "long_name": "Grounded Ice Sheet Area Percentage",
-        "cmip7_units": "%",
+        "long_name": "Grounded Ice Sheet Area Fraction",
+        "cmip7_units": "1",
         "bisicles_units": "1",
-        "conversion_factor": 100.0,
+        "conversion_factor": 1.0,
         "cell_methods": "area: time: mean",
         "modeling_realm": "landIce",
         "cmip7_compliant": True,
         "comment": (
-            "Percentage of cell area covered by grounded ice. "
+            "fraction of cell area covered by grounded ice. "
             "Directly output by BISICLES (not derived from flotation criterion)."
         ),
     },
     "sftflf": {
         "cmip7_name": "sftflf",
         "standard_name": "floating_ice_shelf_area_fraction",
-        "long_name": "Floating Ice Shelf Area Percentage",
-        "cmip7_units": "%",
+        "long_name": "Floating Ice Shelf Area Fraction",
+        "cmip7_units": "1",
         "bisicles_units": "1",
-        "conversion_factor": 100.0,
+        "conversion_factor": 1.0,
         "cell_methods": "area: time: mean",
         "modeling_realm": "landIce",
         "cmip7_compliant": True,
         "comment": (
-            "Percentage of cell area covered by floating ice. "
+            "fraction of cell area covered by floating ice. "
             "Directly output by BISICLES (not derived from flotation criterion)."
         ),
     },
@@ -432,7 +470,7 @@ CF_FIELD_MAPPING = {
         "cmip7_compliant": True,
         "comment": "Positive values indicate accumulation (gain of ice mass).",
     },
-    "libmassbf": {
+    "libmassbfIGNORE": {
         "cmip7_name": "libmassbf",
         "standard_name": "land_ice_basal_specific_mass_balance_flux",
         "long_name": "Land Ice Basal Specific Mass Balance Flux",
@@ -454,8 +492,37 @@ CF_FIELD_MAPPING = {
         "cell_methods": "area: time: mean where ice_sheet",
         "modeling_realm": "landIce",
         "cmip7_compliant": True,
-        "comment": "Positive values indicate calving (loss of ice mass).",
+        "comment": "Negative values indicate calving (loss of ice mass).",
     },
+    
+    "ligroundf": {
+        "cmip7_name": "ligroundf",
+        "standard_name": "land_ice_specific_mass_flux_across_GL",
+        "long_name": "Land Ice Grounded Ice Flux",
+        "cmip7_units": "kg m-2 s-1",
+        "bisicles_units": "kg m-2 yr-1",
+        "conversion_factor": _KG_M2_A_TO_KG_M2_S,
+        "cell_methods": "area: time: mean where ice_sheet",
+        "modeling_realm": "landIce",
+        "cmip7_compliant": True,
+        "comment": "Negative values indicate flux outward (loss of ice mass).",
+    },
+  
+  
+    "lifmassbf": { 
+        "cmip7_name": "lifmassbf",
+        "standard_name": "land_ice_specific_mass_flux_due_to_frontal_melting",
+        "long_name": "Land Ice Calving Flux",
+        "cmip7_units": "kg m-2 s-1",
+        "bisicles_units": "kg m-2 yr-1",
+        "conversion_factor": _KG_M2_A_TO_KG_M2_S,
+        "cell_methods": "area: time: mean where ice_sheet",
+        "modeling_realm": "landIce",
+        "cmip7_compliant": False,
+        "comment": "Zero because BISICLES output does not distinguish between this non-cmip7 var and licalvf",
+},
+    
+    
     "strbasemag": {
         "cmip7_name": "strbasemag",
         "standard_name": "land_ice_basal_drag",
@@ -564,6 +631,21 @@ CF_FIELD_MAPPING = {
         "cmip7_compliant": False,
         "comment": "Not a CMIP7 landIce out_name; retained as a useful diagnostic.",
     },
+    
+    "modified": {
+        "cmip7_name" : "modified",
+        "standard_name": "modified_in_post",
+        "long_name": "Modified in Post",
+        "cmip7_units": "1",
+        "bisicles_units": "1",
+        "conversion_factor": 1.0,
+        "cell_methods": "area: time: mean",
+        "modeling_realm": "landIce",
+        "cmip7_compliant": False,
+        "comment": "keep track of the cells modified in post-processing",
+        
+        
+        }
 }
 
 
@@ -712,7 +794,7 @@ CF_SCALAR_MAPPING = {
     },
 
     # tendlibmassbf — CMIP7: tendlibmassbf_tavg-u-hm-is
-    "tendlibmassbf": {
+    "tendlibmassbfIGNORE": {
         "cmip7_name": "tendlibmassbf",
         "standard_name": "tendency_of_land_ice_mass_due_to_basal_mass_balance",
         "long_name": "Total Basal Mass Balance Flux",
@@ -758,10 +840,22 @@ CF_SCALAR_MAPPING = {
         "conversion_factor": 1.0/ SECS_PER_YEAR,
         "cell_methods": "area: sum where ice_sheet time: mean",
         "cmip7_compliant": True,
-        "comment": "Positive indicates mass loss by calving.",
+        "comment": "Negative indicates mass loss by calving.",
         "ismip7_type":"FL",
     },
-
+    
+    # tendlifmassbf — IMSIP7 request
+    "tendlifmassbf": {
+        "cmip7_name": "tendlifmassbf",
+        "standard_name": "tendency_of_land_ice_mass_due_to_frontal_melting",
+        "long_name": "Total From Flux",
+        "cmip7_units": "kg s-1",
+        "conversion_factor": 1.0/ SECS_PER_YEAR,
+        "cell_methods": "area: sum where ice_sheet time: mean",
+        "cmip7_compliant": False,
+        "comment": "Negative indicates mass loss by melting",
+        "ismip7_type":"FL",
+    },
     # tendligroundf — ISMIP -not in the diagnostics tool yet?
     "tendligroundf": {
         "cmip7_name": "tendligroundf",
