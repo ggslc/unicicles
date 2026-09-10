@@ -321,7 +321,7 @@ def _regrid(flat_data, xygrid):
                 (flat_data["y"], flat_data["x"]),
                 var,
                 bounds_error=False,
-                fill_value=np.nan)
+                fill_value=0.0)
             result["variables"][key] = rg(xy).T
         else:
             result["variables"][key] = flat_data["variables"][key].copy()
@@ -409,6 +409,7 @@ def _read_flatten_nc(nc_path):
                             result["time_cell_methods"][name] = "time: mean"
                 elif v.ndim == 1:
                     #Some bodges ....
+                    arr = arr[-1]
                     # bisicles CF output missing time integration data for scalars
                     if len(name) > 5 and name[:4] == 'tend': # as it happens...
                         result["time_cell_methods"][name] = "time: mean" 
@@ -1063,6 +1064,8 @@ def write_cmip7_per_variable_netcdfs(
     for cf_name, mapping in CF_SCALAR_MAPPING.items():
        
         if cf_name is not None and cf_name in cf_scalars:
+            #print(cf_name)
+            #print(cf_scalars[cf_name])
             arr = np.stack(_sort(cf_scalars[cf_name]), axis=0).flatten()
             out_name = cf_name
             out_path = _out_path(out_name)
