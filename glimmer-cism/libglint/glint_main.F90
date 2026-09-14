@@ -1675,12 +1675,13 @@ contains
     ! this will force a writing of the current state of the ice sheet.
 #ifdef BISICLES_CDRIVER
     use bisicles_cdriver ! only: bisicles_force_write_restart
-
+#endif
     type(glint_params),intent(inout) :: params          ! parameters for this run
 
     integer :: i
     integer :: timestamp ! this comes from the UM and is currently an integer
 
+#ifdef BISICLES_CDRIVER
     do i = 1, params%ninstances
 
        print*,'write a restart', timestamp
