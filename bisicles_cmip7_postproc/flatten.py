@@ -243,30 +243,60 @@ def _apply_rules(flat_data):
     """
     
     fields = flat_data["variables"]
-    
+    ELEVATION_TOLERANCE = 1.0e-2
     if "base" in fields.keys() and "topg" in fields.keys() and "orog" in fields.keys() and "lithk" in fields.keys():
         
         #should not happen, but crops up due to interpolation in CF outout
-        err = fields["base"] <  fields["topg"]
+        err = fields["base"] <  fields["topg"] - ELEVATION_TOLERANCE
+        #fields["modified"] = np.where(err,fields["base"] -  fields["topg"] , 0.0)
         fields["base"] = np.where(err, fields["topg"], fields["base"])
-        
         #set base = topg in all grounded cells
         fields["modified"] = np.where(err, 1.0, 0.0)
-        if "sftgrf" in fields.keys():
-            ZZZ = 1.0-1.0e-10
-            err = np.logical_and(fields["sftgrf"] > ZZZ,fields["topg"] < fields["base"])
-            fields["base"] = np.where(err, fields["topg"], fields["base"])
-            #fields['sftgrf'][err] = ZZZ
-            fields["modified"][err] += 2
         
-        fields["orog"] = fields["base"] +  fields["lithk"]
+        def elevation_differs(a,b):
+            return np.abs(a-b) > ELEVATION_TOLERANCE
+        eps = 1.0e-6
+        if "sftgrf" in fields.keys():
+        
+            err = np.logical_and(fields["sftgrf"] > 1.0 - eps, elevation_differs(fields["topg"], fields["base"]) )
+            if np.any(err):
+               print(np.max( np.abs(fields["base"][err]  - fields["topg"][err])))
+       
+            fields["base"][err] = fields["topg"][err]
+            fields["modified"][err] += 2
+            #err = np.logical_and(fields["sftgrf"] > 1.0 - eps, elevation_differs(fields["topg"], fields["base"]))
+            #if np.any(err):
+            #    print(np.max( np.abs(fields["base"][err]  - fields["topg"][err])))
+        
+        if "sftflf" in fields.keys():
+            err = np.logical_and(fields["sftflf"] > 1-eps, fields["base"] <= fields["topg"])
+            fields["base"] = np.where(err, fields["topg"] + ELEVATION_TOLERANCE*2.0, fields["base"])
+            fields["modified"][err] += 4
+                
+            fields["orog"] = fields["base"] +  fields["lithk"]
         
         err = fields["orog"] < 0.0
         fields["orog"] = np.where(err, 0.0, fields["orog"])
         fields["lithk"] = np.where(err, 0.0, fields["lithk"])
         fields["base"] = np.where(err, 0.0, fields["base"])
-        fields["modified"][err] += 4
+        fields["sftflf"][err] = 0.0
+        fields["sftgrf"][err] = 0.0
+        fields["modified"][err] += 8
         
+        if False:
+            #stupid thick ice in the peninsula....
+            orog_max = 5000.0
+            err = fields["orog"] > orog_max
+            fields["lithk"][err] += orog_max - fields["orog"][err]
+            fields["orog"][err] = fields["base"][err] +  fields["lithk"][err]
+
+            fields["modified"][err] += 16
+    #this seems like none of the checker's business, but hey ho:::
+        if False and "libmassbffl" in fields.keys():  
+            min_libmassbfl = -275*918 #/(3600*24*365)
+            err = fields["libmassbffl"] <  min_libmassbfl 
+            fields["libmassbffl"][err] = min_libmassbfl
+            fields["modified"][err] += 32
 
 
     if "licalvf" in fields.keys():  
@@ -1556,6 +1586,18 @@ def process_directory(
             verbose=False,
         )
         all_data.append((flatten_data, file_info))
+        
+    ### TODO: fix BODGE
+    if False:
+        print (all_data[-1][0]["time"])    
+        if  all_data[-1][0]["time"]%10 == 0:
+            print (f'run ends at {all_data[-1][0]["time"]}, bodging the end')
+            tmp = (all_data[-1][0].copy(), all_data[-1][1])
+            tmp[0]["time"] += 1.0
+            tmp[0]["time_start"] += 1.0
+            tmp[0]["time_end"] += 1.0
+            all_data.append(tmp)
+    ### END BODGE
 
     if verbose:
         print(f"Writing per-variable CMIP7 NetCDF files to {output_dir}...")
