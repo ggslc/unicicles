@@ -295,7 +295,7 @@ def splice_into_ancil_template(topog_data, ancil_template, ancil_output):
     """
 
     fieldg = mule.load_umfile(ancil_template)
-    globe30 = fieldg.fields[0].get_data()
+    globe30 = fieldg.fields[0].get_data().copy()
 
     # Latitude axes in the usual CAP input field ordered in the opposite 
     # direction, so flip our data array N-S

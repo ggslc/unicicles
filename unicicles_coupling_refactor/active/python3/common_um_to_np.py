@@ -30,7 +30,7 @@ def um_to_np_2d(um_dump, stash):
         print("")
         sys.exit(2)
 
-    return um_dump.fields[index].get_data()
+    return um_dump.fields[index].get_data().copy()
 
 
 def find_pslevs(um_dump, indices):
